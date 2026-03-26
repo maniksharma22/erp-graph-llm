@@ -3,7 +3,18 @@ import QueryBox from "./components/QueryBox";
 import GraphView from "./components/GraphView";
 import { Minimize2, Maximize2, PanelLeft, Layers } from "lucide-react";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "";
+const API_BASE_URL = import.meta.env.REACT_APP_API_URL || "";
+
+
+const fetchOrders = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/orders`);
+    const data = await res.json();
+    console.log(data);
+  } catch (err) {
+    console.error("Error fetching orders:", err);
+  }
+};
 
 function App() {
   const [highlightIds, setHighlightIds] = useState([]);
@@ -17,15 +28,11 @@ function App() {
   const graphRef = useRef(null);
 
   // Fetch graph data
- useEffect(() => {
+useEffect(() => {
   const loadGraph = async () => {
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/graph?view=detailed`);
+      const res = await fetch(`${API_BASE_URL}/api/graph?view=detailed`);
       const data = await res.json();
-      if (data.error) {
-        console.error("Backend error:", data.error);
-        return;
-      }
       setGraphData(data);
     } catch (err) {
       console.error("Error fetching graph:", err);
