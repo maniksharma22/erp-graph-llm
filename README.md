@@ -22,7 +22,7 @@ A production‑ready web application that visualizes an ERP dataset as an intera
 
 cd backend  
 npm install  
-npm start  
+node index.js 
 
 ### Frontend
 
