@@ -10,6 +10,7 @@ import ReactFlow, {
 } from "reactflow";
 import dagre from "dagre";
 import "reactflow/dist/style.css";
+import { API_BASE_URL } from "../config"; // ✅ Config se URL import kiya
 
 const nodeWidth = 200;
 const nodeHeight = 60;
@@ -44,7 +45,8 @@ const InnerGraph = forwardRef(({ currentNodeId, highlightIds = [], showOverlay =
   useEffect(() => {
     const loadData = async () => {
       try {
-        const url = `${process.env.REACT_APP_API_URL}/api/graph?view=detailed`;
+        // ✅ Ab ye fetch hamesha sahi Render URL par jayega
+        const url = `${API_BASE_URL}/api/graph?view=detailed`;
         const res = await fetch(url);
         const data = await res.json();
         
@@ -66,12 +68,11 @@ const InnerGraph = forwardRef(({ currentNodeId, highlightIds = [], showOverlay =
         setNodes(getLayoutedElements(initialNodes, initialEdges));
         setEdges(initialEdges);
         setTimeout(() => fitView({ padding: 0.5 }), 100);
-      } catch (err) { console.error(err); }
+      } catch (err) { console.error("GRAPH FETCH ERROR:", err); }
     };
     loadData();
   }, [fitView]);
 
-  // ID matching logic (Fixes the highlighting issue)
   const isMatch = (nodeId, searchIds) => {
     if (!nodeId || !searchIds) return false;
     const targets = Array.isArray(searchIds) ? searchIds : [searchIds];
@@ -85,7 +86,6 @@ const InnerGraph = forwardRef(({ currentNodeId, highlightIds = [], showOverlay =
     }
   }));
 
-  // Logic for the Dialogue Box
   const activeNode = useMemo(() => 
     nodes.find(n => n.id === hoveredNode || isMatch(n.id, highlightIds)),
     [nodes, hoveredNode, highlightIds]

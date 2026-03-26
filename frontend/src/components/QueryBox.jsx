@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { API_BASE_URL } from "../config"; // ✅ Config se URL import kiya
 
 function QueryBox({ setSelectedNodeInGraph }) {
   const [question, setQuestion] = useState("");
@@ -22,7 +23,7 @@ function QueryBox({ setSelectedNodeInGraph }) {
     return formatted;
   };
 
-const handleSubmit = async () => {
+  const handleSubmit = async () => {
     if (!question.trim()) return;
     const userMsg = question;
     setQuestion("");
@@ -30,7 +31,8 @@ const handleSubmit = async () => {
     setLoading(true);
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/query`, {
+      // ✅ Ab ye fetch hamesha sahi URL par jayega
+      const res = await fetch(`${API_BASE_URL}/api/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: userMsg }),
@@ -42,13 +44,11 @@ const handleSubmit = async () => {
       const formattedAnswer = formatResponse(data?.answer);
       setMessages((prev) => [...prev, { type: "ai", text: formattedAnswer }]);
 
-      // DESI JUGAAD: Agar backend nodeIds nahi bhej raha, toh chat text se chura lo
       let finalIds = data.nodeIds || [];
       if (finalIds.length === 0 && data.answer) {
-        const foundIds = data.answer.match(/\b\d{5,}\b/g); // Match 5+ digit numbers
+        const foundIds = data.answer.match(/\b\d{5,}\b/g);
         if (foundIds) {
           finalIds = foundIds.map(id => {
-            // Aapke graph ke prefix yahan match karo
             if (id.startsWith('32')) return `customer-${id}`;
             if (id.startsWith('55')) return `order-${id}`;
             if (id.startsWith('44')) return `payment-${id}`;
@@ -108,6 +108,7 @@ const handleSubmit = async () => {
     </div>
   );
 }
+
 const styles = {
   container: { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#fafafa" },
   chatArea: { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "16px" },

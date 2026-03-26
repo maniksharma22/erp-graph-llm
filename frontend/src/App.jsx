@@ -2,9 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import QueryBox from "./components/QueryBox";
 import GraphView from "./components/GraphView";
 import { Minimize2, Maximize2, PanelLeft, Layers } from "lucide-react";
-
-const API_BASE_URL = import.meta.env.REACT_APP_API_URL || "";
-
+import { API_BASE_URL } from "./config";
 
 const fetchOrders = async () => {
   try {
@@ -27,19 +25,18 @@ function App() {
 
   const graphRef = useRef(null);
 
-  // Fetch graph data
-useEffect(() => {
-  const loadGraph = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/graph?view=detailed`);
-      const data = await res.json();
-      setGraphData(data);
-    } catch (err) {
-      console.error("Error fetching graph:", err);
-    }
-  };
-  loadGraph();
-}, []);
+  useEffect(() => {
+    const loadGraph = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/graph?view=detailed`);
+        const data = await res.json();
+        setGraphData(data);
+      } catch (err) {
+        console.error("Error fetching graph:", err);
+      }
+    };
+    loadGraph();
+  }, []);
 
   const handleHighlightFromChat = useCallback((nodeIds) => {
     if (!nodeIds || nodeIds.length === 0) {
@@ -170,7 +167,6 @@ useEffect(() => {
   );
 }
 
-// ✅ BUTTON + STYLES
 const btnStyle = { display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "12px", cursor: "pointer", fontWeight: "600" };
 const navBtnStyle = { padding: "4px 12px", borderRadius: "6px", border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: "12px" };
 const styles = {
