@@ -3,6 +3,19 @@ import QueryBox from "./components/QueryBox";
 import GraphView from "./components/GraphView";
 import { Minimize2, Maximize2, PanelLeft, Layers } from "lucide-react";
 
+const API_BASE_URL = process.env.REACT_APP_API_URL;
+
+
+const fetchOrders = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/orders`);
+    const data = await res.json();
+    console.log(data);
+  } catch (err) {
+    console.error("Error fetching orders:", err);
+  }
+};
+
 function App() {
   const [highlightIds, setHighlightIds] = useState([]);
   const [currentNodeId, setCurrentNodeId] = useState(null);
