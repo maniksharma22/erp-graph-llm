@@ -1,4 +1,4 @@
-{"billingDocument": "90504298", "billingDocumentItem": "10", "material": "B8907367041603", "billingQuantity": "1", "billingQuantityUnit": "PC", "netAmount": "533.05", "transactionCurrency": "INR", "referenceSdDocument": "80738109", "referenceSdDocumentItem": "10"}
+[{"billingDocument": "90504298", "billingDocumentItem": "10", "material": "B8907367041603", "billingQuantity": "1", "billingQuantityUnit": "PC", "netAmount": "533.05", "transactionCurrency": "INR", "referenceSdDocument": "80738109", "referenceSdDocumentItem": "10"}
 {"billingDocument": "90678703", "billingDocumentItem": "10", "material": "B8907367032571", "billingQuantity": "1", "billingQuantityUnit": "PC", "netAmount": "305.9", "transactionCurrency": "INR", "referenceSdDocument": "80754606", "referenceSdDocumentItem": "10"}
 {"billingDocument": "90678698", "billingDocumentItem": "10", "material": "B8907367022152", "billingQuantity": "1", "billingQuantityUnit": "PC", "netAmount": "382.9", "transactionCurrency": "INR", "referenceSdDocument": "80754601", "referenceSdDocumentItem": "10"}
 {"billingDocument": "90504301", "billingDocumentItem": "10", "material": "B8907367039570", "billingQuantity": "1", "billingQuantityUnit": "PC", "netAmount": "1091.53", "transactionCurrency": "INR", "referenceSdDocument": "80738111", "referenceSdDocumentItem": "10"}
@@ -89,3 +89,4 @@
 {"billingDocument": "90504301", "billingDocumentItem": "30", "material": "S8907367020035", "billingQuantity": "1", "billingQuantityUnit": "PC", "netAmount": "0", "transactionCurrency": "INR", "referenceSdDocument": "80738111", "referenceSdDocumentItem": "30"}
 {"billingDocument": "90504301", "billingDocumentItem": "40", "material": "S8907367020042", "billingQuantity": "1", "billingQuantityUnit": "PC", "netAmount": "0", "transactionCurrency": "INR", "referenceSdDocument": "80738111", "referenceSdDocumentItem": "40"}
 {"billingDocument": "90678701", "billingDocumentItem": "10", "material": "S8907367004448", "billingQuantity": "1", "billingQuantityUnit": "PC", "netAmount": "254", "transactionCurrency": "INR", "referenceSdDocument": "80754604", "referenceSdDocumentItem": "10"}
+]

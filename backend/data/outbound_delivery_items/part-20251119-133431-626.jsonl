@@ -1,4 +1,6 @@
-{"actualDeliveryQuantity": "48", "batch": "", "deliveryDocument": "80737721", "deliveryDocumentItem": "000010", "deliveryQuantityUnit": "PC", "itemBillingBlockReason": "", "lastChangeDate": null, "plant": "1920", "referenceSdDocument": "740506", "referenceSdDocumentItem": "000010", "storageLocation": "V2S2"}
+
+[
+    {"actualDeliveryQuantity": "48", "batch": "", "deliveryDocument": "80737721", "deliveryDocumentItem": "000010", "deliveryQuantityUnit": "PC", "itemBillingBlockReason": "", "lastChangeDate": null, "plant": "1920", "referenceSdDocument": "740506", "referenceSdDocumentItem": "000010", "storageLocation": "V2S2"}
 {"actualDeliveryQuantity": "10", "batch": "", "deliveryDocument": "80737721", "deliveryDocumentItem": "000020", "deliveryQuantityUnit": "PC", "itemBillingBlockReason": "", "lastChangeDate": null, "plant": "1920", "referenceSdDocument": "740506", "referenceSdDocumentItem": "000020", "storageLocation": "V2S2"}
 {"actualDeliveryQuantity": "8", "batch": "", "deliveryDocument": "80737721", "deliveryDocumentItem": "000030", "deliveryQuantityUnit": "PC", "itemBillingBlockReason": "", "lastChangeDate": null, "plant": "1920", "referenceSdDocument": "740506", "referenceSdDocumentItem": "000030", "storageLocation": "V2S2"}
 {"actualDeliveryQuantity": "4", "batch": "", "deliveryDocument": "80737721", "deliveryDocumentItem": "000040", "deliveryQuantityUnit": "PC", "itemBillingBlockReason": "", "lastChangeDate": null, "plant": "1920", "referenceSdDocument": "740506", "referenceSdDocumentItem": "000040", "storageLocation": "V2S2"}
@@ -77,3 +79,4 @@
 {"actualDeliveryQuantity": "1", "batch": "", "deliveryDocument": "80754606", "deliveryDocumentItem": "000010", "deliveryQuantityUnit": "PC", "itemBillingBlockReason": "", "lastChangeDate": null, "plant": "1301", "referenceSdDocument": "740542", "referenceSdDocumentItem": "000010", "storageLocation": "5095"}
 {"actualDeliveryQuantity": "2", "batch": "ABCD", "deliveryDocument": "80754606", "deliveryDocumentItem": "000020", "deliveryQuantityUnit": "PC", "itemBillingBlockReason": "", "lastChangeDate": null, "plant": "1301", "referenceSdDocument": "740542", "referenceSdDocumentItem": "000020", "storageLocation": "5095"}
 {"actualDeliveryQuantity": "1", "batch": "ABCD", "deliveryDocument": "80754606", "deliveryDocumentItem": "000030", "deliveryQuantityUnit": "PC", "itemBillingBlockReason": "", "lastChangeDate": null, "plant": "1301", "referenceSdDocument": "740542", "referenceSdDocumentItem": "000030", "storageLocation": "5095"}
+]
