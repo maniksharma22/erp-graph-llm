@@ -30,14 +30,14 @@ const handleSubmit = async () => {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/query", {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: userMsg }),
       });
 
       const data = await res.json();
-      console.log("RAW BACKEND DATA:", data); // Check if nodeIds is empty here
+      console.log("RAW BACKEND DATA:", data); 
 
       const formattedAnswer = formatResponse(data?.answer);
       setMessages((prev) => [...prev, { type: "ai", text: formattedAnswer }]);
