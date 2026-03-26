@@ -3,7 +3,6 @@ import QueryBox from "./components/QueryBox";
 import GraphView from "./components/GraphView";
 import { Minimize2, Maximize2, PanelLeft, Layers } from "lucide-react";
 
-// ⚡ Safe API base URL
 const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
 function App() {
@@ -18,18 +17,22 @@ function App() {
   const graphRef = useRef(null);
 
   // Fetch graph data
-  useEffect(() => {
-    const loadGraph = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/graph?view=detailed`);
-        const data = await res.json();
-        setGraphData(data);
-      } catch (err) {
-        console.error("Error fetching graph:", err);
+ useEffect(() => {
+  const loadGraph = async () => {
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/graph?view=detailed`);
+      const data = await res.json();
+      if (data.error) {
+        console.error("Backend error:", data.error);
+        return;
       }
-    };
-    loadGraph();
-  }, []);
+      setGraphData(data);
+    } catch (err) {
+      console.error("Error fetching graph:", err);
+    }
+  };
+  loadGraph();
+}, []);
 
   const handleHighlightFromChat = useCallback((nodeIds) => {
     if (!nodeIds || nodeIds.length === 0) {
