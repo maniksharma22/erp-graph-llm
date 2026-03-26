@@ -1,20 +1,10 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import QueryBox from "./components/QueryBox";
 import GraphView from "./components/GraphView";
 import { Minimize2, Maximize2, PanelLeft, Layers } from "lucide-react";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL;
-
-
-const fetchOrders = async () => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/orders`);
-    const data = await res.json();
-    console.log(data);
-  } catch (err) {
-    console.error("Error fetching orders:", err);
-  }
-};
+// ⚡ Safe API base URL
+const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
 function App() {
   const [highlightIds, setHighlightIds] = useState([]);
@@ -23,13 +13,25 @@ function App() {
   const [showOverlay, setShowOverlay] = useState(true);
   const [queryNodes, setQueryNodes] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [graphData, setGraphData] = useState(null);
 
   const graphRef = useRef(null);
 
-  // Optimized Highlight Handler
-  const handleHighlightFromChat = useCallback((nodeIds) => {
-    console.log("APP RECEIVED IDs:", nodeIds); 
+  // Fetch graph data
+  useEffect(() => {
+    const loadGraph = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/graph?view=detailed`);
+        const data = await res.json();
+        setGraphData(data);
+      } catch (err) {
+        console.error("Error fetching graph:", err);
+      }
+    };
+    loadGraph();
+  }, []);
 
+  const handleHighlightFromChat = useCallback((nodeIds) => {
     if (!nodeIds || nodeIds.length === 0) {
       setHighlightIds([]);
       setQueryNodes([]);
@@ -38,17 +40,12 @@ function App() {
       return;
     }
 
-    const ids = nodeIds.map(id => String(id));
-    
-    // Sabse pehle saare nodes ko highlight list mein daalo (Tracing ke liye)
+    const ids = nodeIds.map(String);
     setHighlightIds(ids);
     setQueryNodes(ids);
     setCurrentIndex(0);
-    
-    // Current focus pehla node hoga
     setCurrentNodeId(ids[0]);
 
-    // Graph ko focus karne ke liye thoda delay (rendering safety)
     setTimeout(() => {
       if (graphRef.current?.focusNode) {
         graphRef.current.focusNode(ids[0]);
@@ -87,7 +84,7 @@ function App() {
           </span>
         </div>
       </div>
-      
+
       <div style={styles.main}>
         {!isMinimized && (
           <div style={styles.graphBox}>
@@ -95,24 +92,25 @@ function App() {
               <button style={btnStyle} onClick={() => setIsMinimized(true)}>
                 <Minimize2 size={16} /> Minimize
               </button>
-              <button 
-                style={{ ...btnStyle, background: showOverlay ? "#000" : "#fff", color: showOverlay ? "#fff" : "#000" }} 
+              <button
+                style={{ ...btnStyle, background: showOverlay ? "#000" : "#fff", color: showOverlay ? "#fff" : "#000" }}
                 onClick={() => setShowOverlay(!showOverlay)}
               >
                 <Layers size={16} /> {showOverlay ? "Hide Granular Overlay" : "Show Granular Overlay"}
               </button>
             </div>
 
-            {/* Passing all necessary props to GraphView */}
-            <GraphView 
-              ref={graphRef} 
-              view="detailed" 
-              highlightIds={highlightIds} 
-              showOverlay={showOverlay} 
-              currentNodeId={currentNodeId} 
-            />
+            {graphData && (
+              <GraphView
+                ref={graphRef}
+                view="detailed"
+                data={graphData}
+                highlightIds={highlightIds}
+                showOverlay={showOverlay}
+                currentNodeId={currentNodeId}
+              />
+            )}
 
-            {/* Navigation UI for multiple highlighted nodes */}
             {queryNodes.length > 1 && (
               <div style={styles.navContainer}>
                 <div style={styles.navBtns}>
@@ -133,7 +131,7 @@ function App() {
               </button>
             </div>
           )}
-          
+
           <div style={styles.chatHeaderArea}>
             <div style={styles.chatTitleSection}>
               <h3 style={styles.chatTitle}>Chat with Graph</h3>
@@ -149,12 +147,11 @@ function App() {
               </div>
             </div>
             <div style={styles.welcomeMessage}>
-              Hi! I can help you analyze the <span style={{fontWeight: '700'}}>Order to Cash</span> process.
+              Hi! I can help you analyze the <span style={{ fontWeight: "700" }}>Order to Cash</span> process.
             </div>
           </div>
 
           <div style={styles.bottomSection}>
-            {/* Prop name matches handleHighlightFromChat */}
             <QueryBox setSelectedNodeInGraph={handleHighlightFromChat} />
           </div>
         </div>
@@ -162,11 +159,12 @@ function App() {
     </div>
   );
 }
-// STYLES
+
+// ✅ BUTTON + STYLES
 const btnStyle = { display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "12px", cursor: "pointer", fontWeight: "600" };
 const navBtnStyle = { padding: "4px 12px", borderRadius: "6px", border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: "12px" };
 const styles = {
-  container: { height: "100vh", display: "flex", flexDirection: "column", background: "#f8fafc", fontFamily: 'Inter, sans-serif' },
+  container: { height: "100vh", display: "flex", flexDirection: "column", background: "#f8fafc", fontFamily: "Inter, sans-serif" },
   header: { height: "52px", background: "#fff", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", padding: "0 20px" },
   headerLeft: { display: "flex", alignItems: "center", gap: "12px" },
   verticalDivider: { width: "1px", height: "20px", background: "#e2e8f0" },
