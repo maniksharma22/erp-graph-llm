@@ -44,7 +44,7 @@ const InnerGraph = forwardRef(({ currentNodeId, highlightIds = [], showOverlay =
   useEffect(() => {
     const loadData = async () => {
       try {
-        const url = `http://localhost:5000/api/graph?view=detailed`;
+        const url = `${process.env.REACT_APP_API_URL}/api/graph?view=detailed`;
         const res = await fetch(url);
         const data = await res.json();
         
