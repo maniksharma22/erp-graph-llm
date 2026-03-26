@@ -42,9 +42,8 @@ const handleSubmit = async () => {
       const formattedAnswer = formatResponse(data?.answer);
       setMessages((prev) => [...prev, { type: "ai", text: formattedAnswer }]);
 
-      // 🛠️ DESI JUGAAD: Agar backend nodeIds nahi bhej raha, toh chat text se chura lo
+      // DESI JUGAAD: Agar backend nodeIds nahi bhej raha, toh chat text se chura lo
       let finalIds = data.nodeIds || [];
-
       if (finalIds.length === 0 && data.answer) {
         const foundIds = data.answer.match(/\b\d{5,}\b/g); // Match 5+ digit numbers
         if (foundIds) {
