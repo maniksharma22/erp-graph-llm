@@ -1,143 +1,163 @@
-// backend/controllers/graphController.js
 const fs = require("fs");
 const path = require("path");
 
 // Base data directory
 const BASE_DIR = path.join(__dirname, "..", "data");
 
-// Helper to read JSON or JSONL safely
+// ✅ Robust File Reader: Handles corrupted JSON and JSONL
 const readJsonFile = (filePath) => {
-  console.log("Reading file:", filePath);
-  if (!fs.existsSync(filePath)) {
-    console.warn("Missing file:", filePath);
-    return [];
-  }
-  const ext = path.extname(filePath);
-  try {
-    if (ext === ".json") return JSON.parse(fs.readFileSync(filePath, "utf-8"));
-    if (ext === ".jsonl") {
-      return fs
-        .readFileSync(filePath, "utf-8")
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => JSON.parse(line));
+    console.log("Reading file:", filePath);
+    if (!fs.existsSync(filePath)) {
+        console.warn("Missing file:", filePath);
+        return [];
     }
-  } catch (err) {
-    console.error("Parse error in file:", filePath, err.message);
+
+    try {
+        const content = fs.readFileSync(filePath, "utf-8").trim();
+        if (!content) return [];
+
+        const ext = path.extname(filePath);
+
+        // If it's a standard JSON array
+        if (ext === ".json") {
+            try {
+                return JSON.parse(content);
+            } catch (e) {
+                // Fallback: If .json file actually contains JSONL data
+                return content.split("\n")
+                    .filter(Boolean)
+                    .map(line => {
+                        try { return JSON.parse(line.replace(/,$/, "")); } 
+                        catch (err) { return null; }
+                    })
+                    .filter(Boolean);
+            }
+        }
+
+        // If it's JSONL (Line by Line)
+        if (ext === ".jsonl") {
+            return content.split("\n")
+                .filter(Boolean)
+                .map(line => {
+                    try { 
+                        // Remove leading/trailing brackets or commas if they exist
+                        let cleanLine = line.trim();
+                        if (cleanLine.startsWith("[")) cleanLine = cleanLine.substring(1);
+                        if (cleanLine.endsWith("]") || cleanLine.endsWith(",")) cleanLine = cleanLine.slice(0, -1);
+                        return JSON.parse(cleanLine); 
+                    } catch (err) { return null; }
+                })
+                .filter(Boolean);
+        }
+    } catch (err) {
+        console.error("Critical parse error in:", filePath, err.message);
+        return [];
+    }
     return [];
-  }
-  return [];
 };
 
-// Read all JSONL files in a folder safely
+// Read all JSONL files in a folder
 const readJsonlFolder = (folderPath) => {
-  if (!fs.existsSync(folderPath)) {
-    console.warn("Missing folder:", folderPath);
-    return [];
-  }
-  const files = fs.readdirSync(folderPath).filter((f) => f.endsWith(".jsonl"));
-  let result = [];
-  files.forEach((file) => {
-    result = result.concat(readJsonFile(path.join(folderPath, file)));
-  });
-  return result;
+    if (!fs.existsSync(folderPath)) return [];
+    try {
+        const files = fs.readdirSync(folderPath).filter((f) => f.endsWith(".jsonl"));
+        let result = [];
+        files.forEach((file) => {
+            result = result.concat(readJsonFile(path.join(folderPath, file)));
+        });
+        return result;
+    } catch (e) {
+        return [];
+    }
 };
 
 const getGraph = async (req, res) => {
-  try {
-    const nodes = [];
-    const edges = [];
-    const nodeMap = new Map();
+    try {
+        const edges = [];
+        const nodeMap = new Map();
 
-    // Business Partners / Customers
-    const bpFile = path.join(BASE_DIR, "business_partners.json");
-    const businessPartners = readJsonFile(bpFile);
-    businessPartners.forEach((bp) => {
-      if (!bp.customer) return;
-      nodeMap.set(bp.customer, {
-        id: bp.customer,
-        label: bp.businessPartnerFullName || bp.customer,
-        meta: bp,
-      });
-    });
-
-    // Sales Orders
-    const soFile = path.join(BASE_DIR, "sales_orders.json");
-    const salesOrders = readJsonFile(soFile);
-    salesOrders.forEach((so) => {
-      if (!so.sales_order_id) return;
-      nodeMap.set(so.sales_order_id, {
-        id: so.sales_order_id,
-        label: `Order ${so.sales_order_id}`,
-        meta: so,
-      });
-      if (so.customer)
-        edges.push({
-          id: `e-cust-${so.sales_order_id}`,
-          source: so.customer,
-          target: so.sales_order_id,
+        // 1. Business Partners
+        const businessPartners = readJsonFile(path.join(BASE_DIR, "business_partners.jsonl"));
+        businessPartners.forEach((bp) => {
+            const id = bp.customer || bp.businessPartner;
+            if (!id) return;
+            nodeMap.set(id, {
+                id: id,
+                label: bp.businessPartnerFullName || id,
+                meta: bp,
+                type: 'customer'
+            });
         });
-    });
 
-    // Deliveries
-    const deliveryFolder = path.join(BASE_DIR, "outbound_delivery_items");
-    const deliveries = readJsonlFolder(deliveryFolder);
-    deliveries.forEach((d) => {
-      if (!d.delivery_id) return;
-      nodeMap.set(d.delivery_id, {
-        id: d.delivery_id,
-        label: `Delivery ${d.delivery_id}`,
-        meta: d,
-      });
-      if (d.sales_order_id)
-        edges.push({
-          id: `e-order-${d.delivery_id}`,
-          source: d.sales_order_id,
-          target: d.delivery_id,
+        // 2. Sales Orders
+        const salesOrders = readJsonFile(path.join(BASE_DIR, "sales_orders.jsonl"));
+        salesOrders.forEach((so) => {
+            const id = so.salesOrder || so.sales_order_id;
+            if (!id) return;
+            nodeMap.set(id, {
+                id: id,
+                label: `Order ${id}`,
+                meta: so,
+                type: 'order'
+            });
+            const custId = so.soldToParty || so.customer;
+            if (custId) {
+                edges.push({ id: `e-cust-${id}`, source: custId, target: id });
+            }
         });
-    });
 
-    // Invoices
-    const invoiceFolder = path.join(BASE_DIR, "billing_document_items");
-    const invoices = readJsonlFolder(invoiceFolder);
-    invoices.forEach((inv) => {
-      if (!inv.invoice_id) return;
-      nodeMap.set(inv.invoice_id, {
-        id: inv.invoice_id,
-        label: `Invoice ${inv.invoice_id}`,
-        meta: inv,
-      });
-      if (inv.delivery_id)
-        edges.push({
-          id: `e-del-${inv.invoice_id}`,
-          source: inv.delivery_id,
-          target: inv.invoice_id,
+        // 3. Deliveries (Folder)
+        const deliveries = readJsonlFolder(path.join(BASE_DIR, "outbound_delivery_items"));
+        deliveries.forEach((d) => {
+            const id = d.delivery_id || d.outboundDelivery;
+            if (!id) return;
+            nodeMap.set(id, {
+                id: id, label: `Delivery ${id}`, meta: d, type: 'delivery'
+            });
+            const soId = d.sales_order_id || d.referenceSDDocument;
+            if (soId) {
+                edges.push({ id: `e-order-${id}`, source: soId, target: id });
+            }
         });
-    });
 
-    // Payments
-    const paymentsFile = path.join(BASE_DIR, "payments_accounts_receivable.jsonl");
-    const payments = readJsonlFolder(paymentsFile);
-    payments.forEach((p) => {
-      if (!p.payment_id) return;
-      nodeMap.set(p.payment_id, {
-        id: p.payment_id,
-        label: `Payment ${p.payment_id}`,
-        meta: p,
-      });
-      if (p.customer)
-        edges.push({
-          id: `e-custpay-${p.payment_id}`,
-          source: p.customer,
-          target: p.payment_id,
+        // 4. Invoices (Folder)
+        const invoices = readJsonlFolder(path.join(BASE_DIR, "billing_document_items"));
+        invoices.forEach((inv) => {
+            const id = inv.invoice_id || inv.billingDocument;
+            if (!id) return;
+            nodeMap.set(id, {
+                id: id, label: `Invoice ${id}`, meta: inv, type: 'invoice'
+            });
+            const delId = inv.delivery_id || inv.referenceSDDocument;
+            if (delId) {
+                edges.push({ id: `e-del-${id}`, source: delId, target: id });
+            }
         });
-    });
 
-    res.json({ nodes: Array.from(nodeMap.values()), edges });
-  } catch (err) {
-    console.error("Graph fetch error:", err.message, err.stack);
-    res.status(500).json({ error: "Error fetching graph data" });
-  }
+        // 5. Payments (File fix: Using readJsonFile instead of Folder)
+        const payments = readJsonFile(path.join(BASE_DIR, "payments_accounts_receivable.jsonl"));
+        payments.forEach((p) => {
+            const id = p.payment_id || p.accountingDocument;
+            if (!id) return;
+            nodeMap.set(id, {
+                id: id, label: `Payment ${id}`, meta: p, type: 'payment'
+            });
+            const custId = p.customer;
+            if (custId) {
+                edges.push({ id: `e-pay-${id}`, source: custId, target: id });
+            }
+        });
+
+        // Send Clean Response
+        res.json({ 
+            nodes: Array.from(nodeMap.values()), 
+            edges: edges 
+        });
+
+    } catch (err) {
+        console.error("Graph fetch error:", err.message);
+        res.status(500).json({ nodes: [], edges: [], error: "Internal Server Error" });
+    }
 };
 
 module.exports = { getGraph };
