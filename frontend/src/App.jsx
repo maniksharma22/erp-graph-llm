@@ -86,7 +86,7 @@ function App() {
                 style={{ ...btnStyle, background: showOverlay ? "#000" : "#fff", color: showOverlay ? "#fff" : "#000" }} 
                 onClick={() => setShowOverlay(!showOverlay)}
               >
-                <Layers size={16} /> {showOverlay ? "Hide Overlay" : "Show Overlay"}
+                <Layers size={16} /> {showOverlay ? "Hide Granular Overlay" : "Show Granular Overlay"}
               </button>
             </div>
 
