@@ -1,157 +1,203 @@
-import { useState, useEffect, forwardRef, useImperativeHandle, useMemo, useCallback } from "react";
-import ReactFlow, { 
-  Controls, 
-  Background, 
-  ReactFlowProvider, 
-  useReactFlow, 
+import React, { useMemo, useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import ReactFlow, {
+  Controls,
+  Background,
+  MiniMap,
+  ReactFlowProvider,
   MarkerType,
-  applyNodeChanges,
-  applyEdgeChanges 
+  useReactFlow,
 } from "reactflow";
 import dagre from "dagre";
 import "reactflow/dist/style.css";
-import { API_BASE_URL } from "../config"; // ✅ Config se URL import kiya
 
-const nodeWidth = 200;
-const nodeHeight = 60;
+import orders from "../data/sales_orders.json";
+import billing1 from "../data/billing_document_items/part-20251119-133432-233.json";
+import billing2 from "../data/billing_document_items/part-20251119-133432-978.json";
+import deliveries1 from "../data/outbound_delivery_items/part-20251119-133431-439.json";
+import deliveries2 from "../data/outbound_delivery_items/part-20251119-133431-626.json";
+import payments from "../data/payments_accounts_receivable.json";
 
-const getLayoutedElements = (nodes, edges) => {
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: "LR", nodesep: 100, ranksep: 300 });
-  g.setDefaultEdgeLabel(() => ({}));
-  nodes.forEach((n) => g.setNode(n.id, { width: nodeWidth, height: nodeHeight }));
+const billings = [...billing1, ...billing2];
+const deliveries = [...deliveries1, ...deliveries2];
+
+const NODE_WIDTH = 200;
+const NODE_HEIGHT = 60;
+
+const g = new dagre.graphlib.Graph();
+g.setDefaultEdgeLabel(() => ({}));
+
+const layoutElements = (nodes, edges) => {
+  g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 180 });
+  nodes.forEach((n) => g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT }));
   edges.forEach((e) => g.setEdge(e.source, e.target));
   dagre.layout(g);
   return nodes.map((n) => {
     const pos = g.node(n.id);
-    return { 
-      ...n, 
-      position: { x: pos.x - nodeWidth / 2, y: pos.y - nodeHeight / 2 },
-      targetPosition: 'left',
-      sourcePosition: 'right'
-    };
+    return { ...n, position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 } };
   });
 };
 
-const InnerGraph = forwardRef(({ currentNodeId, highlightIds = [], showOverlay = true }, ref) => {
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
+const createNode = (id, type, value, accentColor, rawData) => ({
+  id,
+  data: {
+    type,
+    value,
+    accentColor,
+    rawData,
+    label: (
+      <div style={{ textAlign: "left" }}>
+        <div style={{ fontSize: "9px", color: accentColor, fontWeight: "800", textTransform: "uppercase" }}>
+          {type}
+        </div>
+        <div style={{ fontSize: "12px", color: "#1e293b", fontWeight: "700" }}>
+          {value}
+        </div>
+      </div>
+    ),
+  },
+  style: {
+    padding: "12px",
+    borderRadius: "8px",
+    background: "#ffffff",
+    border: `1.5px solid ${accentColor}`,
+    width: NODE_WIDTH,
+    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+    transition: "all 0.3s ease",
+  },
+});
+
+const createEdge = (source, target) => ({
+  id: `e-${source}-${target}`,
+  source,
+  target,
+  animated: true,
+  style: { stroke: "#94a3b8", strokeWidth: 2 },
+  markerEnd: { type: MarkerType.ArrowClosed, color: "#94a3b8" },
+});
+
+const GraphContent = forwardRef(({ highlightIds = [], currentNodeId }, ref) => {
+  const { fitView, setNodes } = useReactFlow();
   const [hoveredNode, setHoveredNode] = useState(null);
-  const { setCenter, fitView, getViewport } = useReactFlow();
+  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
-  const onNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
-  const onEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
+  const { nodes, edges } = useMemo(() => {
+    let rawNodes = [];
+    let rawEdges = [];
+    orders.slice(0, 15).forEach((order, index) => {
+      const orderId = String(order.salesOrder);
+      const customerId = String(order.soldToParty);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        // ✅ Ab ye fetch hamesha sahi Render URL par jayega
-        const url = `${API_BASE_URL}/api/graph?view=detailed`;
-        const res = await fetch(url);
-        const data = await res.json();
-        
-        const initialNodes = data.nodes.map(n => ({
-          id: String(n.id),
-          data: { label: n.label, meta: n.meta || {} },
-          position: { x: 0, y: 0 }
-        }));
+      rawNodes.push(createNode(`cust-${customerId}`, "Customer", customerId, "#10b981", order));
+      rawNodes.push(createNode(`order-${orderId}`, "Sales Order", orderId, "#3b82f6", order));
+      rawEdges.push(createEdge(`cust-${customerId}`, `order-${orderId}`));
 
-        const initialEdges = data.edges.map((e, i) => ({
-          id: `e-${i}`,
-          source: String(e.source),
-          target: String(e.target),
-          animated: true,
-          style: { stroke: '#3b82f6', strokeWidth: 2 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' }
-        }));
+      const delivery = deliveries[index];
+      if (delivery) {
+        const delId = String(delivery.outboundDelivery || delivery.referenceSDDocument || `DEL-${index}`);
+        rawNodes.push(createNode(`del-${delId}`, "Delivery", delId, "#8b5cf6", delivery));
+        rawEdges.push(createEdge(`order-${orderId}`, `del-${delId}`));
 
-        setNodes(getLayoutedElements(initialNodes, initialEdges));
-        setEdges(initialEdges);
-        setTimeout(() => fitView({ padding: 0.5 }), 100);
-      } catch (err) { console.error("GRAPH FETCH ERROR:", err); }
-    };
-    loadData();
-  }, [fitView]);
+        const bill = billings[index];
+        if (bill) {
+          const billId = String(bill.billingDocument);
+          rawNodes.push(createNode(`bill-${billId}`, "Invoice", billId, "#f59e0b", bill));
+          rawEdges.push(createEdge(`del-${delId}`, `bill-${billId}`));
 
-  const isMatch = (nodeId, searchIds) => {
-    if (!nodeId || !searchIds) return false;
-    const targets = Array.isArray(searchIds) ? searchIds : [searchIds];
-    return targets.some(id => String(nodeId).includes(String(id).split('-').pop()));
-  };
+          const pay = payments[index];
+          if (pay) {
+            const payId = String(pay.accountingDocument);
+            rawNodes.push(createNode(`pay-${payId}`, "Payment", payId, "#ef4444", pay));
+            rawEdges.push(createEdge(`bill-${billId}`, `pay-${payId}`));
+          }
+        }
+      }
+    });
+    const uniqueNodes = Array.from(new Map(rawNodes.map((n) => [n.id, n])).values());
+    return { nodes: layoutElements(uniqueNodes, rawEdges), edges: rawEdges };
+  }, []);
 
+  // Expose focusNode for App navigation
   useImperativeHandle(ref, () => ({
-    focusNode: (id) => {
-      const node = nodes.find(n => isMatch(n.id, id));
-      if (node) setCenter(node.position.x + nodeWidth/2, node.position.y + nodeHeight/2, { zoom: 1.2, duration: 800 });
-    }
+    focusNode: (nodeId) => {
+      const nodeEl = document.querySelector(`[data-id="${nodeId}"]`);
+      nodeEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
   }));
 
-  const activeNode = useMemo(() => 
-    nodes.find(n => n.id === hoveredNode || isMatch(n.id, highlightIds)),
-    [nodes, hoveredNode, highlightIds]
-  );
+  // Highlight nodes
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((n) => ({
+        ...n,
+        style: {
+          ...n.style,
+          border: highlightIds.includes(n.id) ? "2px solid #f59e0b" : n.style.border,
+        },
+      }))
+    );
+  }, [highlightIds, setNodes]);
 
-  const getBoxStyle = () => {
-    if (!activeNode) return { display: 'none' };
-    const { x: vX, y: vY, zoom } = getViewport();
-    return {
-      position: 'absolute',
-      left: `${(activeNode.position.x + nodeWidth) * zoom + vX + 20}px`,
-      top: `${activeNode.position.y * zoom + vY - 20}px`,
-      width: "280px",
-      background: "white",
-      borderRadius: "12px",
-      boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-      zIndex: 1000,
-      border: "1px solid #3b82f6",
-      pointerEvents: "none"
-    };
-  };
+  useEffect(() => {
+    setTimeout(() => fitView({ padding: 0.2 }), 100);
+  }, [fitView]);
 
   return (
-    <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      <ReactFlow
-        nodes={nodes.map(n => {
-          const highlighted = isMatch(n.id, highlightIds) || n.id === hoveredNode;
-          return {
-            ...n,
-            style: {
-              background: '#fff', borderRadius: '8px', padding: '10px', width: nodeWidth,
-              border: highlighted ? '3px solid #3b82f6' : '1px solid #cbd5e1',
-              boxShadow: highlighted ? '0 0 20px rgba(59, 130, 246, 0.4)' : 'none',
-              fontWeight: 'bold', textAlign: 'center'
-            }
-          }
-        })}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeMouseEnter={(_, n) => setHoveredNode(n.id)}
-        onNodeMouseLeave={() => setHoveredNode(null)}
-      >
-        <Background variant="dots" gap={12} size={1} />
-        <Controls />
+    <div
+      style={{ width: "100%", height: "100%", position: "relative" }}
+      onMouseMove={(e) => setCursorPos({ x: e.clientX, y: e.clientY })}
+    >
+      <ReactFlow nodes={nodes} edges={edges} onNodeMouseEnter={(_, node) => setHoveredNode(node)} onNodeMouseLeave={() => setHoveredNode(null)} proOptions={{ hideAttribution: true }}>
+        <Background variant="dots" gap={20} color="#e2e8f0" />
+        <Controls showInteractive={false} style={{ boxShadow: "none", border: "1px solid #e2e8f0" }} />
+        <MiniMap nodeStrokeWidth={3} maskColor="rgb(248, 250, 252, 0.7)" style={{ border: "1px solid #e2e8f0", borderRadius: "8px" }} />
       </ReactFlow>
 
-      {activeNode && (
-        <div style={getBoxStyle()}>
-          <div style={{ background: '#3b82f6', color: 'white', padding: '10px', borderRadius: '10px 10px 0 0' }}>
-            <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{activeNode.data.label}</div>
+      {hoveredNode && (
+        <div
+          style={{
+            position: "absolute",
+            left: cursorPos.x + 20,
+            top: cursorPos.y + 20,
+            width: "300px",
+            background: "#ffffff",
+            borderRadius: "12px",
+            boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
+            padding: "16px",
+            border: `2px solid ${hoveredNode.data.accentColor}`,
+            zIndex: 9999,
+            pointerEvents: "none",
+            fontSize: "12px",
+            color: "#1e293b",
+          }}
+        >
+          <div style={{ fontWeight: "700", color: hoveredNode.data.accentColor, marginBottom: "8px" }}>
+            {hoveredNode.data.type} — {hoveredNode.data.value}
           </div>
-          <div style={{ padding: '10px' }}>
-            {Object.entries(activeNode.data.meta || {}).map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '5px' }}>
-                <span style={{ color: '#64748b', fontWeight: 'bold' }}>{k.toUpperCase()}:</span>
-                <span style={{ fontWeight: 'bold' }}>{String(v)}</span>
-              </div>
-            ))}
-          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <tbody>
+              {Object.entries(hoveredNode.data.rawData).map(([k, v]) => {
+                if (typeof v === "object" || v === null) return null;
+                return (
+                  <tr key={k}>
+                    <td style={{ fontWeight: "500", padding: "2px 4px", color: "#64748b" }}>{k.replace(/([A-Z])/g, " $1")}</td>
+                    <td style={{ textAlign: "right", padding: "2px 4px", fontWeight: "600" }}>{String(v)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 });
 
-export default forwardRef((props, ref) => (
-  <ReactFlowProvider><InnerGraph ref={ref} {...props} /></ReactFlowProvider>
-));
+export default function GraphView(props) {
+  return (
+    <div style={{ width: "100%", height: "100%" }}>
+      <ReactFlowProvider>
+        <GraphContent {...props} />
+      </ReactFlowProvider>
+    </div>
+  );
+}

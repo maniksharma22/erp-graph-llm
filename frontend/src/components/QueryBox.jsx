@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { API_BASE_URL } from "../config"; // ✅ Config se URL import kiya
+import { API_BASE_URL } from "../config";
 
 function QueryBox({ setSelectedNodeInGraph }) {
   const [question, setQuestion] = useState("");
@@ -7,31 +7,27 @@ function QueryBox({ setSelectedNodeInGraph }) {
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // Scroll to bottom on new messages
   useEffect(() => {
-    scrollToBottom();
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // Format AI response (handles **bold** text)
   const formatResponse = (text) => {
     if (!text) return "";
-    let formatted = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    const idRegex = /\b\d{5,}\b/g;
-    formatted = formatted.replace(idRegex, (match) => `<strong>${match}</strong>`);
-    return formatted;
+    return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
   };
 
+  // Handle sending user query
   const handleSubmit = async () => {
     if (!question.trim()) return;
+
     const userMsg = question;
     setQuestion("");
     setMessages((prev) => [...prev, { type: "user", text: userMsg }]);
     setLoading(true);
 
     try {
-      // ✅ Ab ye fetch hamesha sahi URL par jayega
       const res = await fetch(`${API_BASE_URL}/api/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -39,31 +35,23 @@ function QueryBox({ setSelectedNodeInGraph }) {
       });
 
       const data = await res.json();
-      console.log("RAW BACKEND DATA:", data); 
 
-      const formattedAnswer = formatResponse(data?.answer);
-      setMessages((prev) => [...prev, { type: "ai", text: formattedAnswer }]);
+      // Show clean single-sentence AI answer
+      const aiAnswer = data?.answer || "No matching ERP records found.";
+      setMessages((prev) => [
+        ...prev,
+        { type: "ai", text: formatResponse(aiAnswer) },
+      ]);
 
-      let finalIds = data.nodeIds || [];
-      if (finalIds.length === 0 && data.answer) {
-        const foundIds = data.answer.match(/\b\d{5,}\b/g);
-        if (foundIds) {
-          finalIds = foundIds.map(id => {
-            if (id.startsWith('32')) return `customer-${id}`;
-            if (id.startsWith('55')) return `order-${id}`;
-            if (id.startsWith('44')) return `payment-${id}`;
-            return id;
-          });
-        }
-      }
-
-      if (finalIds.length > 0) {
-        console.log("🚀 HIGHLIGHTING NODES:", finalIds);
-        setSelectedNodeInGraph(finalIds); 
+      // Highlight nodes in graph
+      if (data.nodeIds && data.nodeIds.length > 0) {
+        setSelectedNodeInGraph(data.nodeIds);
       }
     } catch (err) {
-      console.error("FETCH ERROR:", err);
-      setMessages((prev) => [...prev, { type: "ai", text: "Error fetching response." }]);
+      setMessages((prev) => [
+        ...prev,
+        { type: "ai", text: "Connection error with ERP system." },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -73,21 +61,29 @@ function QueryBox({ setSelectedNodeInGraph }) {
     <div style={styles.container}>
       <div style={styles.chatArea}>
         {messages.map((m, i) => (
-          <div key={i} style={m.type === "user" ? styles.userBlock : styles.aiBlock}>
+          <div
+            key={i}
+            style={m.type === "user" ? styles.userBlock : styles.aiBlock}
+          >
             {m.type === "ai" && (
               <div style={styles.aiHeader}>
                 <img src="/logo.jpg" style={styles.avatar} alt="AI" />
                 <div>
                   <div style={styles.aiName}>Dodge AI</div>
-                  <div style={styles.aiSub}>Graph Agent</div>
+                  <div style={styles.aiSub}>ERP Analyst</div>
                 </div>
               </div>
             )}
-            <div style={m.type === "user" ? styles.userBubble : styles.aiText} dangerouslySetInnerHTML={{ __html: m.text }} />
-            {m.type === "user" && <img src="/logo1.jpg" style={styles.userAvatar} alt="user" />}
+            <div
+              style={m.type === "user" ? styles.userBubble : styles.aiText}
+              dangerouslySetInnerHTML={{ __html: m.text }}
+            />
+            {m.type === "user" && (
+              <img src="/logo1.jpg" style={styles.userAvatar} alt="user" />
+            )}
           </div>
         ))}
-        {loading && <div style={styles.statusText}>Dodge AI is analyzing...</div>}
+        {loading && <div style={styles.statusText}>Analyzing...</div>}
         <div ref={chatEndRef} />
       </div>
 
@@ -95,12 +91,34 @@ function QueryBox({ setSelectedNodeInGraph }) {
         <div style={styles.inputCard}>
           <div style={styles.statusHeader}>
             <div style={loading ? styles.dotPulse : styles.dot} />
-            <span style={styles.statusLabel}>{loading ? "Processing..." : "Dodge AI is awaiting instructions"}</span>
+            <span style={styles.statusLabel}>
+              {loading ? "Processing ERP query..." : "Dodge AI Active"}
+            </span>
           </div>
           <div style={styles.inputArea}>
-            <textarea placeholder="Analyze anything" value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }} style={styles.textarea} />
+            <textarea
+              placeholder="Analyze anything"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+              style={styles.textarea}
+            />
             <div style={styles.bottomRow}>
-              <button onClick={handleSubmit} disabled={loading || !question.trim()} style={{ ...styles.button, background: question.trim() ? "#1a1a1a" : "#ccc" }}>Send</button>
+              <button
+                onClick={handleSubmit}
+                disabled={loading || !question.trim()}
+                style={{
+                  ...styles.button,
+                  background: question.trim() ? "#1a1a1a" : "#ccc",
+                }}
+              >
+                Send
+              </button>
             </div>
           </div>
         </div>
@@ -110,28 +128,28 @@ function QueryBox({ setSelectedNodeInGraph }) {
 }
 
 const styles = {
-  container: { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#fafafa" },
+  container: { display: "flex", flexDirection: "column", height: "100%", background: "#fafafa" },
   chatArea: { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "16px" },
-  userBlock: { alignSelf: "flex-end", display: "flex", alignItems: "flex-end", gap: "8px", maxWidth: "75%" },
+  userBlock: { alignSelf: "flex-end", display: "flex", alignItems: "flex-end", gap: "8px", maxWidth: "80%" },
   userBubble: { background: "#111", color: "#fff", padding: "10px 14px", borderRadius: "14px", fontSize: "14px" },
-  aiBlock: { alignSelf: "flex-start", maxWidth: "75%" },
+  aiBlock: { alignSelf: "flex-start", maxWidth: "80%" },
   aiHeader: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" },
   aiName: { fontWeight: "600", fontSize: "14px", color: "#111" },
   aiSub: { fontSize: "11px", color: "#888" },
-  aiText: { fontSize: "14px", color: "#222", background: "#fff", padding: "10px 14px", borderRadius: "12px", border: "1px solid #eee", lineHeight: "1.6" },
+  aiText: { fontSize: "14px", color: "#222", background: "#fff", padding: "12px", borderRadius: "12px", border: "1px solid #eee", lineHeight: "1.5" },
   avatar: { width: "28px", height: "28px", borderRadius: "50%" },
   userAvatar: { width: "28px", height: "28px", borderRadius: "50%" },
-  inputWrapper: { padding: "12px 20px", background: "#fff", borderTop: "1px solid #eee" },
-  inputCard: { border: "1px solid #e5e7eb", borderRadius: "14px", background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" },
+  inputWrapper: { padding: "15px", background: "#fff", borderTop: "1px solid #eee" },
+  inputCard: { border: "1px solid #e5e7eb", borderRadius: "14px", background: "#fff" },
   statusHeader: { background: "#f9fafb", padding: "8px 12px", display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid #eee" },
   dot: { width: "8px", height: "8px", background: "#22c55e", borderRadius: "50%" },
   dotPulse: { width: "8px", height: "8px", background: "#f59e0b", borderRadius: "50%", animation: "pulse 1.5s infinite" },
-  statusLabel: { fontSize: "12px", color: "#666", fontWeight: "500" },
+  statusLabel: { fontSize: "11px", color: "#666", fontWeight: "600" },
   inputArea: { padding: "10px" },
-  textarea: { width: "100%", height: "50px", border: "none", outline: "none", resize: "none", fontSize: "14px", fontFamily: "inherit" },
-  bottomRow: { display: "flex", justifyContent: "flex-end", marginTop: "6px" },
-  button: { padding: "8px 18px", borderRadius: "10px", border: "none", background: "#111", color: "#fff", cursor: "pointer", fontWeight: "600", fontSize: "13px" },
-  statusText: { fontSize: "12px", color: "#999", marginTop: "4px", fontStyle: "italic" }
+  textarea: { width: "100%", height: "45px", border: "none", outline: "none", resize: "none", fontSize: "14px" },
+  bottomRow: { display: "flex", justifyContent: "flex-end", marginTop: "5px" },
+  button: { padding: "6px 15px", borderRadius: "8px", border: "none", color: "#fff", cursor: "pointer", fontWeight: "600" },
+  statusText: { fontSize: "12px", color: "#999", fontStyle: "italic", marginLeft: "20px" }
 };
 
 export default QueryBox;
