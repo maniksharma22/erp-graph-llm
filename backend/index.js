@@ -11,9 +11,9 @@ const graphRoutes = require("./routes/graphRoutes");
 const app = express();
 
 app.use(cors({
-  origin: process.env.NODE_ENV === "production" ? "https://your-frontend.vercel.app" : "*",
+  origin: "https://erp-graph-llm.vercel.app", // Aapka actual frontend URL
   methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"]
+  credentials: true
 }));
 
 app.use(express.json());
