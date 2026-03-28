@@ -155,7 +155,7 @@ const GraphContent = forwardRef(({ highlightIds = [] }, ref) => {
       const firstId = highlightIds[0];
       return nodes.find((n) => n.id.includes(firstId) || String(n.data.value).includes(firstId)) || null;
     });
-  }, [highlightIds, setNodes, nodes]);
+  }, [highlightIds, setNodes]);
 
   return (
     <div
