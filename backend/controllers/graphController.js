@@ -1,10 +1,14 @@
 const { Pool } = require('pg');
+
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 const getGraph = async (req, res) => {
@@ -12,24 +16,49 @@ const getGraph = async (req, res) => {
     const edges = [];
     const nodeMap = new Map();
 
-    // 1. Customers
-    const customers = await pool.query('SELECT * FROM business_partners');
+    const customers = await pool.query('SELECT * FROM customers');
     customers.rows.forEach(c => {
-      nodeMap.set(c.customer_id, { id: c.customer_id, label: c.customer_name, type: 'customer', meta: c });
+      const id = c.customer_id || c.id; 
+      nodeMap.set(id, { 
+        id: id, 
+        label: c.name || c.customer_name, 
+        type: 'customer', 
+        meta: c 
+      });
     });
 
-    // 2. Orders
     const orders = await pool.query('SELECT * FROM sales_orders');
     orders.rows.forEach(o => {
-      nodeMap.set(o.sales_order_id, { id: o.sales_order_id, label: `Order ${o.sales_order_id}`, type: 'order', meta: o });
-      if (nodeMap.has(o.customer_id)) edges.push({ id: `e-c-${o.sales_order_id}`, source: o.customer_id, target: o.sales_order_id });
+      const orderId = o.order_id || o.sales_order_id;
+      const customerId = o.customer_id;
+
+      nodeMap.set(orderId, { 
+        id: orderId, 
+        label: `Order ${orderId}`, 
+        type: 'order', 
+        meta: o 
+      });
+
+      if (nodeMap.has(customerId)) {
+        edges.push({ 
+          id: `e-c-${orderId}`, 
+          source: customerId, 
+          target: orderId 
+        });
+      }
     });
 
-    // Repeat for deliveries, invoices, payments...
+    res.json({ 
+      nodes: Array.from(nodeMap.values()), 
+      edges: edges 
+    });
 
-    res.json({ nodes: Array.from(nodeMap.values()), edges });
   } catch (err) {
-    res.status(500).json({ nodes: [], edges: [], error: err.message });
+    res.status(500).json({ 
+      nodes: [], 
+      edges: [], 
+      error: err.message 
+    });
   }
 };
 

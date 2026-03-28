@@ -11,7 +11,7 @@ const graphRoutes = require("./routes/graphRoutes");
 const app = express();
 
 app.use(cors({
-  origin: "https://erp-graph-llm.vercel.app/", 
+  origin: "https://erp-graph-llm.vercel.app", 
   methods: ["GET", "POST"],
   credentials: true
 }));
