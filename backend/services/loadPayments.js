@@ -13,7 +13,7 @@ const pool = new Pool({
 });
 
 async function loadPayments() {
-  const filePath = path.join(__dirname, '../data/payments_accounts_receivable.jsonl');
+  const filePath = path.join(__dirname, '../data/payments_accounts_receivable.json');
 
   const lines = fs.readFileSync(filePath, 'utf-8').split('\n');
 

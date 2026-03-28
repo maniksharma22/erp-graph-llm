@@ -1,26 +1,25 @@
-// controllers/queryController.js
-const { runNaturalQuery } = require("../services/llmService"); // ✅ Correct path
+const llmService = require("../services/llmService");
 
 const handleQuery = async (req, res) => {
   try {
-    const query = req.body.query || req.body.q;
+    const query = req.body.query || req.body.prompt || req.body.q;
 
-    if (!query || !query.trim()) {
-      return res.status(400).json({ answer: "Please provide a valid ERP query.", nodeIds: [] });
+    if (!query) {
+      return res.status(400).json({ answer: "Query is required." });
     }
 
-    // Run the LLM service
-    const result = await runNaturalQuery(query);
+    const result = await llmService.runNaturalQuery(query);
 
-    // Always return clean, human-readable response without N/A
-    let cleanAnswer = result.answer || "I couldn't find any matching ERP data.";
-    cleanAnswer = cleanAnswer.replace(/\b(N\/A|Not available)\b/g, ""); // remove N/A
-
-    res.json({ answer: cleanAnswer.trim(), nodeIds: result.nodeIds || [] });
-
+    if (result.success) {
+      res.json({ 
+        answer: result.answer, 
+        data: result.data 
+      });
+    } else {
+      res.json({ answer: "Error: " + result.error });
+    }
   } catch (error) {
-    console.error("Error in handleQuery:", error);
-    res.status(500).json({ answer: "Technical error while fetching ERP data.", nodeIds: [] });
+    res.status(500).json({ answer: "Technical error: " + error.message });
   }
 };
 

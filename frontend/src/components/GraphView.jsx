@@ -1,11 +1,12 @@
-import React, { useMemo, useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import React, { useMemo, useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import ReactFlow, {
   Controls,
   Background,
   MiniMap,
   ReactFlowProvider,
   MarkerType,
-  useReactFlow,
+  useNodesState,
+  useEdgesState,
 } from "reactflow";
 import dagre from "dagre";
 import "reactflow/dist/style.css";
@@ -22,7 +23,6 @@ const deliveries = [...deliveries1, ...deliveries2];
 
 const NODE_WIDTH = 200;
 const NODE_HEIGHT = 60;
-
 const g = new dagre.graphlib.Graph();
 g.setDefaultEdgeLabel(() => ({}));
 
@@ -49,9 +49,7 @@ const createNode = (id, type, value, accentColor, rawData) => ({
         <div style={{ fontSize: "9px", color: accentColor, fontWeight: "800", textTransform: "uppercase" }}>
           {type}
         </div>
-        <div style={{ fontSize: "12px", color: "#1e293b", fontWeight: "700" }}>
-          {value}
-        </div>
+        <div style={{ fontSize: "12px", color: "#1e293b", fontWeight: "700" }}>{value}</div>
       </div>
     ),
   },
@@ -75,12 +73,11 @@ const createEdge = (source, target) => ({
   markerEnd: { type: MarkerType.ArrowClosed, color: "#94a3b8" },
 });
 
-const GraphContent = forwardRef(({ highlightIds = [], currentNodeId }, ref) => {
-  const { fitView, setNodes } = useReactFlow();
+const GraphContent = forwardRef(({ highlightIds = [] }, ref) => {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
-  const { nodes, edges } = useMemo(() => {
+  const { initialNodes, initialEdges } = useMemo(() => {
     let rawNodes = [];
     let rawEdges = [];
     orders.slice(0, 15).forEach((order, index) => {
@@ -113,10 +110,13 @@ const GraphContent = forwardRef(({ highlightIds = [], currentNodeId }, ref) => {
       }
     });
     const uniqueNodes = Array.from(new Map(rawNodes.map((n) => [n.id, n])).values());
-    return { nodes: layoutElements(uniqueNodes, rawEdges), edges: rawEdges };
+    return { initialNodes: layoutElements(uniqueNodes, rawEdges), initialEdges: rawEdges };
   }, []);
 
-  // Expose focusNode for App navigation
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Expose focusNode
   useImperativeHandle(ref, () => ({
     focusNode: (nodeId) => {
       const nodeEl = document.querySelector(`[data-id="${nodeId}"]`);
@@ -124,29 +124,52 @@ const GraphContent = forwardRef(({ highlightIds = [], currentNodeId }, ref) => {
     },
   }));
 
-  // Highlight nodes
+  // === HIGHLIGHT NODES BASED ON QUERY ===
   useEffect(() => {
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        style: {
-          ...n.style,
-          border: highlightIds.includes(n.id) ? "2px solid #f59e0b" : n.style.border,
-        },
-      }))
-    );
-  }, [highlightIds, setNodes]);
+    if (!highlightIds || highlightIds.length === 0) {
+      setHoveredNode(null);
+      setNodes((nds) =>
+        nds.map((n) => ({ ...n, style: { ...n.style, border: `1.5px solid ${n.data.accentColor}`, transform: "scale(1)", zIndex: 1 } }))
+      );
+      return;
+    }
 
-  useEffect(() => {
-    setTimeout(() => fitView({ padding: 0.2 }), 100);
-  }, [fitView]);
+    setNodes((nds) =>
+      nds.map((n) => {
+        const isMatch = highlightIds.some((id) => n.id.includes(id) || String(n.data.value).includes(id));
+        return {
+          ...n,
+          style: {
+            ...n.style,
+            border: isMatch ? "3px solid #f59e0b" : `1.5px solid ${n.data.accentColor}`,
+            boxShadow: isMatch ? "0 0 20px #f59e0b" : "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+            transform: isMatch ? "scale(1.1)" : "scale(1)",
+            zIndex: isMatch ? 1000 : 1,
+          },
+        };
+      })
+    );
+
+    // Show tooltip for first highlighted node
+    const firstNodeId = highlightIds[0];
+    const node = nodes.find((n) => n.id.includes(firstNodeId) || String(n.data.value).includes(firstNodeId));
+    if (node) setHoveredNode(node);
+  }, [highlightIds, nodes, setNodes]);
 
   return (
-    <div
-      style={{ width: "100%", height: "100%", position: "relative" }}
-      onMouseMove={(e) => setCursorPos({ x: e.clientX, y: e.clientY })}
-    >
-      <ReactFlow nodes={nodes} edges={edges} onNodeMouseEnter={(_, node) => setHoveredNode(node)} onNodeMouseLeave={() => setHoveredNode(null)} proOptions={{ hideAttribution: true }}>
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeMouseEnter={(e, node) => {
+          setHoveredNode(node);
+          setCursorPos({ x: e.clientX, y: e.clientY });
+        }}
+        onNodeMouseLeave={() => setHoveredNode(null)}
+        proOptions={{ hideAttribution: true }}
+      >
         <Background variant="dots" gap={20} color="#e2e8f0" />
         <Controls showInteractive={false} style={{ boxShadow: "none", border: "1px solid #e2e8f0" }} />
         <MiniMap nodeStrokeWidth={3} maskColor="rgb(248, 250, 252, 0.7)" style={{ border: "1px solid #e2e8f0", borderRadius: "8px" }} />
@@ -155,7 +178,7 @@ const GraphContent = forwardRef(({ highlightIds = [], currentNodeId }, ref) => {
       {hoveredNode && (
         <div
           style={{
-            position: "absolute",
+            position: "fixed",
             left: cursorPos.x + 20,
             top: cursorPos.y + 20,
             width: "300px",
