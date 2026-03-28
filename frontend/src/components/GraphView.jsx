@@ -10,7 +10,6 @@ import ReactFlow, {
 import dagre from "dagre";
 import "reactflow/dist/style.css";
 
-// Note: Local JSON imports (Baad mein API props use kar sakte hain)
 import orders from "../data/sales_orders.json";
 import billing1 from "../data/billing_document_items/part-20251119-133432-233.json";
 import billing2 from "../data/billing_document_items/part-20251119-133432-978.json";
@@ -56,7 +55,7 @@ const createNode = (id, type, value, accentColor, rawData) => ({
     padding: "12px",
     borderRadius: "8px",
     background: "#ffffff",
-    border: `1.5px solid ${accentColor}`, // ✅ Fixed Backticks
+    border: `1.5px solid ${accentColor}`, 
     width: NODE_WIDTH,
     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
     transition: "all 0.3s ease",
@@ -64,7 +63,7 @@ const createNode = (id, type, value, accentColor, rawData) => ({
 });
 
 const createEdge = (source, target) => ({
-  id: `e-${source}-${target}`, // ✅ Fixed Backticks
+  id: `e-${source}-${target}`, 
   source,
   target,
   animated: true,
@@ -164,7 +163,6 @@ const GraphContent = forwardRef(({ highlightIds = [] }, ref) => {
       >
         <Background variant="dots" gap={20} color="#e2e8f0" />
         <Controls showInteractive={false} style={{ border: "1px solid #e2e8f0" }} />
-        <MiniMap nodeStrokeWidth={3} style={{ border: "1px solid #e2e8f0", borderRadius: "8px" }} />
       </ReactFlow>
 
       {hoveredNode && (
