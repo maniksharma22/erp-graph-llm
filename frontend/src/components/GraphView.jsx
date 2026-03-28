@@ -26,6 +26,7 @@ const NODE_HEIGHT = 60;
 const g = new dagre.graphlib.Graph();
 g.setDefaultEdgeLabel(() => ({}));
 
+// Layout helper
 const layoutElements = (nodes, edges) => {
   g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 180 });
   nodes.forEach((n) => g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT }));
@@ -37,22 +38,18 @@ const layoutElements = (nodes, edges) => {
   });
 };
 
+// Memoized node label component
+const NodeLabel = ({ type, value, accentColor }) => (
+  <div style={{ textAlign: "left" }}>
+    <div style={{ fontSize: "9px", color: accentColor, fontWeight: "800", textTransform: "uppercase" }}>{type}</div>
+    <div style={{ fontSize: "12px", color: "#1e293b", fontWeight: "700" }}>{value}</div>
+  </div>
+);
+
+// Node/Edge creation helpers
 const createNode = (id, type, value, accentColor, rawData) => ({
   id,
-  data: {
-    type,
-    value,
-    accentColor,
-    rawData,
-    label: (
-      <div style={{ textAlign: "left" }}>
-        <div style={{ fontSize: "9px", color: accentColor, fontWeight: "800", textTransform: "uppercase" }}>
-          {type}
-        </div>
-        <div style={{ fontSize: "12px", color: "#1e293b", fontWeight: "700" }}>{value}</div>
-      </div>
-    ),
-  },
+  data: { type, value, accentColor, rawData, label: <NodeLabel type={type} value={value} accentColor={accentColor} /> },
   style: {
     padding: "12px",
     borderRadius: "8px",
@@ -77,9 +74,11 @@ const GraphContent = forwardRef(({ highlightIds = [] }, ref) => {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
+  // Prepare initial nodes & edges
   const { initialNodes, initialEdges } = useMemo(() => {
-    let rawNodes = [];
-    let rawEdges = [];
+    const rawNodes = [];
+    const rawEdges = [];
+
     orders.slice(0, 15).forEach((order, index) => {
       const orderId = String(order.salesOrder);
       const customerId = String(order.soldToParty);
@@ -109,6 +108,7 @@ const GraphContent = forwardRef(({ highlightIds = [] }, ref) => {
         }
       }
     });
+
     const uniqueNodes = Array.from(new Map(rawNodes.map((n) => [n.id, n])).values());
     return { initialNodes: layoutElements(uniqueNodes, rawEdges), initialEdges: rawEdges };
   }, []);
@@ -116,7 +116,7 @@ const GraphContent = forwardRef(({ highlightIds = [] }, ref) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Expose focusNode
+  // Expose focusNode for parent
   useImperativeHandle(ref, () => ({
     focusNode: (nodeId) => {
       const nodeEl = document.querySelector(`[data-id="${nodeId}"]`);
@@ -124,7 +124,7 @@ const GraphContent = forwardRef(({ highlightIds = [] }, ref) => {
     },
   }));
 
-  // === HIGHLIGHT NODES BASED ON QUERY ===
+  // Highlight nodes & show tooltip based on AI answer
   useEffect(() => {
     if (!highlightIds || highlightIds.length === 0) {
       setHoveredNode(null);
@@ -150,14 +150,18 @@ const GraphContent = forwardRef(({ highlightIds = [] }, ref) => {
       })
     );
 
-    // Show tooltip for first highlighted node
-    const firstNodeId = highlightIds[0];
-    const node = nodes.find((n) => n.id.includes(firstNodeId) || String(n.data.value).includes(firstNodeId));
-    if (node) setHoveredNode(node);
-  }, [highlightIds, nodes, setNodes]);
+    // Tooltip for first highlighted node
+    setHoveredNode((prev) => {
+      const firstId = highlightIds[0];
+      return nodes.find((n) => n.id.includes(firstId) || String(n.data.value).includes(firstId)) || null;
+    });
+  }, [highlightIds, setNodes, nodes]);
 
   return (
-    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+    <div
+      style={{ width: "100%", height: "100%", position: "relative" }}
+      onMouseMove={(e) => setCursorPos({ x: e.clientX, y: e.clientY })}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
