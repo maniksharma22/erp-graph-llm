@@ -4,21 +4,11 @@ import GraphView from "./components/GraphView";
 import { Minimize2, Maximize2, PanelLeft, Layers } from "lucide-react";
 import { API_BASE_URL } from "./config";
 
-const fetchOrders = async () => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/orders`);
-    const data = await res.json();
-    console.log(data);
-  } catch (err) {
-    console.error("Error fetching orders:", err);
-  }
-};
-
 function App() {
   const [highlightIds, setHighlightIds] = useState([]);
   const [currentNodeId, setCurrentNodeId] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [showOverlay, setShowOverlay] = useState(true);
+  const [showOverlay, setShowOverlay] = useState(true); // Toggle for Box
   const [queryNodes, setQueryNodes] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [graphData, setGraphData] = useState(null);
@@ -32,7 +22,7 @@ function App() {
         const data = await res.json();
         setGraphData(data);
       } catch (err) {
-        console.error("Error fetching graph:", err);
+        console.error(err);
       }
     };
     loadGraph();
@@ -46,36 +36,34 @@ function App() {
       setCurrentIndex(0);
       return;
     }
-
     const ids = nodeIds.map(String);
     setHighlightIds(ids);
     setQueryNodes(ids);
+    setShowOverlay(true); 
     setCurrentIndex(0);
     setCurrentNodeId(ids[0]);
-
-    setTimeout(() => {
-      if (graphRef.current?.focusNode) {
-        graphRef.current.focusNode(ids[0]);
-      }
-    }, 100);
   }, []);
 
   const goNext = () => {
-    if (currentIndex + 1 >= queryNodes.length) return;
-    const nextIndex = currentIndex + 1;
-    setCurrentIndex(nextIndex);
-    const nextNodeId = queryNodes[nextIndex];
-    setCurrentNodeId(nextNodeId);
-    graphRef.current?.focusNode(nextNodeId);
+    if (currentIndex + 1 < queryNodes.length) {
+      const nextIdx = currentIndex + 1;
+      setCurrentIndex(nextIdx);
+      setCurrentNodeId(queryNodes[nextIdx]);
+      if (graphRef.current?.focusNext) {
+        graphRef.current.focusNext();
+      }
+    }
   };
 
   const goPrev = () => {
-    if (currentIndex - 1 < 0) return;
-    const prevIndex = currentIndex - 1;
-    setCurrentIndex(prevIndex);
-    const prevNodeId = queryNodes[prevIndex];
-    setCurrentNodeId(prevNodeId);
-    graphRef.current?.focusNode(prevNodeId);
+    if (currentIndex - 1 >= 0) {
+      const prevIdx = currentIndex - 1;
+      setCurrentIndex(prevIdx);
+      setCurrentNodeId(queryNodes[prevIdx]);
+      if (graphRef.current?.focusPrev) {
+        graphRef.current.focusPrev();
+      }
+    }
   };
 
   return (
@@ -100,7 +88,12 @@ function App() {
                 <Minimize2 size={16} /> Minimize
               </button>
               <button
-                style={{ ...btnStyle, background: showOverlay ? "#000" : "#fff", color: showOverlay ? "#fff" : "#000" }}
+                style={{ 
+                  ...btnStyle, 
+                  background: showOverlay ? "#000" : "#fff", 
+                  color: showOverlay ? "#fff" : "#000",
+                  transition: "all 0.3s ease" 
+                }}
                 onClick={() => setShowOverlay(!showOverlay)}
               >
                 <Layers size={16} /> {showOverlay ? "Hide Granular Overlay" : "Show Granular Overlay"}
@@ -113,8 +106,8 @@ function App() {
                 view="detailed"
                 data={graphData}
                 highlightIds={highlightIds}
-                showOverlay={showOverlay}
                 currentNodeId={currentNodeId}
+                showOverlay={showOverlay} // Passing state to GraphView
               />
             )}
 
@@ -138,7 +131,6 @@ function App() {
               </button>
             </div>
           )}
-
           <div style={styles.chatHeaderArea}>
             <div style={styles.chatTitleSection}>
               <h3 style={styles.chatTitle}>Chat with Graph</h3>
@@ -157,7 +149,6 @@ function App() {
               Hi! I can help you analyze the <span style={{ fontWeight: "700" }}>Order to Cash</span> process.
             </div>
           </div>
-
           <div style={styles.bottomSection}>
             <QueryBox setSelectedNodeInGraph={handleHighlightFromChat} />
           </div>
@@ -169,6 +160,7 @@ function App() {
 
 const btnStyle = { display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "12px", cursor: "pointer", fontWeight: "600" };
 const navBtnStyle = { padding: "4px 12px", borderRadius: "6px", border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: "12px" };
+
 const styles = {
   container: { height: "100vh", display: "flex", flexDirection: "column", background: "#f8fafc", fontFamily: "Inter, sans-serif" },
   header: { height: "52px", background: "#fff", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", padding: "0 20px" },
@@ -192,7 +184,7 @@ const styles = {
   navContainer: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", zIndex: 10 },
   navBtns: { background: "#fff", padding: "8px 16px", borderRadius: "50px", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" },
   navCount: { fontSize: "13px", fontWeight: "700" },
-  bottomSection: { flex: 1, overflow: "hidden" }
+  bottomSection: { flex: 1, overflow: "hidden" },
 };
 
 export default App;

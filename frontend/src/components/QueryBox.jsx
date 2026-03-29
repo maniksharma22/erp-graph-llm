@@ -12,46 +12,58 @@ function QueryBox({ setSelectedNodeInGraph }) {
   }, [messages, loading]);
 
   const formatResponse = (text) => {
-    if (!text) return "";
-    return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-               .replace(/(#[0-9]+)/g, '<span style="color: #2563eb; font-weight: bold;">$1</span>');
+    if (!text) return "No information available.";
+    return text
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/(#[0-9]+)/g, '<span style="color: #2563eb; font-weight: bold;">$1</span>')
+      .replace(/\n/g, "<br />");
   };
 
   const handleSubmit = async () => {
-  if (!question.trim()) return;
+    if (!question.trim() || loading) return;
 
-  const userMsg = question;
-  setQuestion("");
-  setMessages((prev) => [...prev, { type: "user", text: userMsg }]);
-  setLoading(true);
+    const userMsg = question;
+    setQuestion("");
+    setMessages((prev) => [...prev, { type: "user", text: userMsg }]);
+    setLoading(true);
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/query`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: userMsg }),
-    });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: userMsg }),
+      });
 
-    const data = await res.json();
+      if (!res.ok) {
+        throw new Error("Network response was not ok");
+      }
 
-    // Add AI response to chat
-    const aiText = formatResponse(data.answer || "No response from ERP AI.");
-    setMessages((prev) => [...prev, { type: "ai", text: aiText }]);
+      const data = await res.json();
 
-    // ✅ Node highlighting
-    if (Array.isArray(data.nodeIds) && data.nodeIds.length > 0) {
-      setSelectedNodeInGraph(data.nodeIds); // directly update selected nodes
-    } else {
-      setSelectedNodeInGraph([]); // clear if no nodes returned
+      // --- CRITICAL SAFETY CHECK ---
+      // Agar 'data.answer' undefined hai, toh ye fallback message dikhayega
+      const finalResponse = data.answer || "I'm sorry, I couldn't process that request. Please try again.";
+      const aiText = formatResponse(finalResponse);
+      
+      setMessages((prev) => [...prev, { type: "ai", text: aiText }]);
+
+      if (data.nodeIds && Array.isArray(data.nodeIds)) {
+        setSelectedNodeInGraph(data.nodeIds);
+      } else {
+        setSelectedNodeInGraph([]);
+      }
+
+    } catch (err) {
+      console.error("Fetch error:", err);
+      setMessages((prev) => [
+        ...prev, 
+        { type: "ai", text: "<strong>System Note:</strong> Connection lost. Please check if the backend is running." }
+      ]);
+      setSelectedNodeInGraph([]);
+    } finally {
+      setLoading(false);
     }
-
-  } catch (err) {
-    setMessages((prev) => [...prev, { type: "ai", text: "ERP Server connection lost." }]);
-    setSelectedNodeInGraph([]); 
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div style={styles.container}>
@@ -74,7 +86,7 @@ function QueryBox({ setSelectedNodeInGraph }) {
             {m.type === "user" && <img src="/logo1.jpg" style={styles.userAvatar} alt="user" />}
           </div>
         ))}
-        {loading && <div style={styles.statusText}>Analyzing Graph...</div>}
+        {loading && <div style={styles.statusText}>Analyzing...</div>}
         <div ref={chatEndRef} />
       </div>
 
@@ -93,7 +105,11 @@ function QueryBox({ setSelectedNodeInGraph }) {
               style={styles.textarea}
             />
             <div style={styles.bottomRow}>
-              <button onClick={handleSubmit} disabled={loading || !question.trim()} style={{ ...styles.button, background: question.trim() ? "#1a1a1a" : "#ccc" }}>
+              <button 
+                onClick={handleSubmit} 
+                disabled={loading || !question.trim()} 
+                style={{ ...styles.button, background: question.trim() ? "#1a1a1a" : "#ccc" }}
+              >
                 Send
               </button>
             </div>

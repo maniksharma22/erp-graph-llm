@@ -1,49 +1,64 @@
 require('dotenv').config();
-
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+  connectionString: "postgresql://postrgress:ITBLAlyFpAtjqSUiD6DatGOpqGwhTebj@dpg-d72e2724d50c738ngbq0-a.singapore-postgres.render.com/erp_db_z8kd",
+  ssl: { rejectUnauthorized: false }
 });
 
 async function loadDeliveries() {
+  console.log("🚀 Starting Delivery Load (Array Mode)...");
   const folderPath = path.join(__dirname, '../data/outbound_delivery_items');
 
-  const files = fs.readdirSync(folderPath);
+  if (!fs.existsSync(folderPath)) {
+    console.error("❌ Folder not found:", folderPath);
+    return;
+  }
+
+  const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.json'));
 
   for (let file of files) {
+    console.log(`⏳ Processing file: ${file}`);
     const filePath = path.join(folderPath, file);
-    const lines = fs.readFileSync(filePath, 'utf-8').split('\n');
+    
+    try {
+      const rawData = fs.readFileSync(filePath, 'utf-8');
+      const deliveryItems = JSON.parse(rawData); // Parse the whole array at once
 
-    for (let line of lines) {
-      if (!line.trim()) continue;
-
-      try {
-        const data = JSON.parse(line);
-
-        await pool.query(
-          `INSERT INTO deliveries (delivery_id, sales_order_id)
-           VALUES ($1, $2)
-           ON CONFLICT (delivery_id) DO NOTHING`,
-          [
-            data.deliveryDocument,
-            data.referenceSdDocument
-          ]
-        );
-
-      } catch (err) {
-        console.log("Error:", err.message);
+      for (let data of deliveryItems) {
+        try {
+          await pool.query(
+            `INSERT INTO deliveries (
+              delivery_id, delivery_item, sales_order_id, actual_quantity, 
+              quantity_unit, plant, storage_location, reference_item, batch
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (delivery_id, delivery_item) DO UPDATE SET
+              plant = EXCLUDED.plant,
+              storage_location = EXCLUDED.storage_location`,
+            [
+              data.deliveryDocument,
+              data.deliveryDocumentItem,
+              data.referenceSdDocument,
+              parseFloat(data.actualDeliveryQuantity) || 0,
+              data.deliveryQuantityUnit,
+              data.plant,            // This will now capture "WB05" correctly
+              data.storageLocation,   // This will now capture "5031" correctly
+              data.referenceSdDocumentItem,
+              data.batch
+            ]
+          );
+        } catch (dbErr) {
+          console.error(`❌ DB Error for Doc ${data.deliveryDocument}:`, dbErr.message);
+        }
       }
+    } catch (parseErr) {
+      console.error(`❌ JSON Parse Error in file ${file}:`, parseErr.message);
     }
   }
 
-  console.log("✅ Deliveries inserted");
+  console.log("🎉 ALL DELIVERY DATA LOADED SUCCESSFULLY");
   await pool.end();
 }
 
