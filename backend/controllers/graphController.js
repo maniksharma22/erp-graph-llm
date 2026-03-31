@@ -35,7 +35,8 @@ const getGraphData = async (req, res) => {
       products: readData(path.join(d, 'products')),
       descriptions: readData(path.join(d, 'product_descriptions')),
       deliveries: readData(path.join(d, 'outbound_delivery_items')),
-      billings: readData(path.join(d, 'billing_document_items'))
+      billings: readData(path.join(d, 'billing_document_items')),
+      journals: readData(path.join(d, 'journal_entry_items_accounts_receivable'))
     };
 
     // Mapping relations
@@ -60,6 +61,13 @@ const getGraphData = async (req, res) => {
     r.descriptions = r.descriptions.map(d => ({ ...d, product: String(d.product), productDescription: d.productDescription }));
 
     r.storageLocs = r.storageLocs.map(s => ({ ...s, plant: String(s.plant), storageLocation: String(s.storageLocation), product: String(s.product) }));
+
+    r.journals = r.journals.map(j => ({ 
+      ...j, 
+      accountingDocument: String(j.accountingDocument), 
+      referenceDocument: String(j.referenceDocument),  
+      customer: String(j.customer)
+    }));
 
     res.json(r);
   } catch (e) { res.status(500).json({ error: e.message }); }

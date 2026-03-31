@@ -14,7 +14,8 @@ function QueryBox({ setSelectedNodeInGraph }) {
   const formatResponse = (text) => {
     if (!text) return "No information available.";
     return text
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Bold
+      .replace(/^\* (.*$)/gim, "<li>$1</li>") // Bullet points support
       .replace(/(#[0-9]+)/g, '<span style="color: #2563eb; font-weight: bold;">$1</span>')
       .replace(/\n/g, "<br />");
   };
@@ -31,7 +32,10 @@ function QueryBox({ setSelectedNodeInGraph }) {
       const res = await fetch(`${API_BASE_URL}/api/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: userMsg }),
+        body: JSON.stringify({
+          prompt: userMsg,
+          history: messages.map(m => ({ role: m.type === "user" ? "user" : "assistant", content: m.text }))
+        }),
       });
 
       if (!res.ok) {
@@ -39,12 +43,12 @@ function QueryBox({ setSelectedNodeInGraph }) {
       }
 
       const data = await res.json();
+      console.log(">>> BACKEND SE KYA AAYA:", data);
 
       // --- CRITICAL SAFETY CHECK ---
-      // Agar 'data.answer' undefined hai, toh ye fallback message dikhayega
       const finalResponse = data.answer || "I'm sorry, I couldn't process that request. Please try again.";
       const aiText = formatResponse(finalResponse);
-      
+
       setMessages((prev) => [...prev, { type: "ai", text: aiText }]);
 
       if (data.nodeIds && Array.isArray(data.nodeIds)) {
@@ -56,7 +60,7 @@ function QueryBox({ setSelectedNodeInGraph }) {
     } catch (err) {
       console.error("Fetch error:", err);
       setMessages((prev) => [
-        ...prev, 
+        ...prev,
         { type: "ai", text: "<strong>System Note:</strong> Connection lost. Please check if the backend is running." }
       ]);
       setSelectedNodeInGraph([]);
@@ -79,9 +83,9 @@ function QueryBox({ setSelectedNodeInGraph }) {
                 </div>
               </div>
             )}
-            <div 
-              style={m.type === "user" ? styles.userBubble : styles.aiText} 
-              dangerouslySetInnerHTML={{ __html: m.text }} 
+            <div
+              style={m.type === "user" ? styles.userBubble : styles.aiText}
+              dangerouslySetInnerHTML={{ __html: m.text }}
             />
             {m.type === "user" && <img src="/logo1.jpg" style={styles.userAvatar} alt="user" />}
           </div>
@@ -105,9 +109,9 @@ function QueryBox({ setSelectedNodeInGraph }) {
               style={styles.textarea}
             />
             <div style={styles.bottomRow}>
-              <button 
-                onClick={handleSubmit} 
-                disabled={loading || !question.trim()} 
+              <button
+                onClick={handleSubmit}
+                disabled={loading || !question.trim()}
                 style={{ ...styles.button, background: question.trim() ? "#1a1a1a" : "#ccc" }}
               >
                 Send
@@ -124,34 +128,35 @@ const styles = {
   container: { display: "flex", flexDirection: "column", height: "100%", background: "#fafafa" },
   chatArea: { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "16px" },
   userBlock: { alignSelf: "flex-end", display: "flex", alignItems: "flex-end", gap: "8px", maxWidth: "80%" },
-  userBubble: { background: "#111", color: "#fff", padding: "10px 14px", borderRadius: "14px", fontSize: "14px" },
+  userBubble: { background: "#111", color: "#fff", padding: "10px 14px", borderRadius: "14px", fontSize: "17px" },
   aiBlock: { alignSelf: "flex-start", maxWidth: "80%" },
   aiHeader: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" },
   aiName: { fontWeight: "600", fontSize: "14px", color: "#111" },
   aiSub: { fontSize: "11px", color: "#888" },
-  aiText: { 
-    fontSize: "14px", 
-    color: "#222", 
-    background: "#fff", 
-    padding: "12px", 
-    borderRadius: "12px", 
-    border: "1px solid #eee", 
+  aiText: {
+    fontSize: "16px",
+    color: "#222",
+    background: "#fff",
+    padding: "16px",
+    borderRadius: "12px",
+    border: "1px solid #eee",
     lineHeight: "1.6",
-    whiteSpace: "pre-line"
+    whiteSpace: "pre-line",
+    fontSize:"16px"
   },
   avatar: { width: "28px", height: "28px", borderRadius: "50%" },
   userAvatar: { width: "28px", height: "28px", borderRadius: "50%" },
   inputWrapper: { padding: "15px", background: "#fff", borderTop: "1px solid #eee" },
-  inputCard: { border: "1px solid #e5e7eb", borderRadius: "14px", background: "#fff" },
+  inputCard: { border: "1px solid #e5e7eb", borderRadius: "14px", background: "#fff",minHeight: "140px",display: "flex",flexDirection: "column" },
   statusHeader: { background: "#f9fafb", padding: "8px 12px", display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid #eee" },
   dot: { width: "8px", height: "8px", background: "#22c55e", borderRadius: "50%" },
   dotPulse: { width: "8px", height: "8px", background: "#f59e0b", borderRadius: "50%", animation: "pulse 1.5s infinite" },
   statusLabel: { fontSize: "11px", color: "#666", fontWeight: "600" },
-  inputArea: { padding: "10px" },
-  textarea: { width: "100%", height: "45px", border: "none", outline: "none", resize: "none", fontSize: "14px" },
+  inputArea: { padding: "10px", minHeight: "100px" },
+  textarea: { width: "100%", height: "100px", border: "none", outline: "none", resize: "none", fontSize: "16px" },
   bottomRow: { display: "flex", justifyContent: "flex-end", marginTop: "5px" },
   button: { padding: "6px 15px", borderRadius: "8px", border: "none", color: "#fff", cursor: "pointer", fontWeight: "600" },
-  statusText: { fontSize: "12px", color: "#999", fontStyle: "italic", marginLeft: "20px" }
+  statusText: { fontSize: "14px", color: "#999", fontStyle: "italic", marginLeft: "20px" }
 };
 
 export default QueryBox;
