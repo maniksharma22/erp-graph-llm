@@ -14,8 +14,8 @@ function QueryBox({ setSelectedNodeInGraph }) {
   const formatResponse = (text) => {
     if (!text) return "No information available.";
     return text
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Bold
-      .replace(/^\* (.*$)/gim, "<li>$1</li>") // Bullet points support
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") 
+      .replace(/^\* (.*$)/gim, "<li>$1</li>") 
       .replace(/(#[0-9]+)/g, '<span style="color: #2563eb; font-weight: bold;">$1</span>')
       .replace(/\n/g, "<br />");
   };
@@ -67,7 +67,10 @@ function QueryBox({ setSelectedNodeInGraph }) {
       console.error("Fetch error:", err);
       setMessages((prev) => [
         ...prev,
-        { type: "ai", text: "<strong>System Note:</strong> Connection lost. Please check if the backend is running." }
+       { 
+      type: "ai", 
+      text: "I'm having trouble connecting right now. Please check your internet or try again in a moment." 
+      }
       ]);
       setSelectedNodeInGraph([]);
     } finally {
