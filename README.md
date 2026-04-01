@@ -38,17 +38,25 @@ The system follows a seamless data flow to transform natural language into visua
 - **Stable Performance:** Handles API limits smoothly for consistent results
 - **Smart Layout:** Uses Dagre to organize graph neatly even with large data
 
-## Installation
+# Installation
 
-### Backend Setup
-1. Navigate to the backend directory: `cd backend`
-2. Install dependencies: `npm install`
-3. **Configure environment:** Create a `.env` file with your Database URL and Groq API Key.
-4. Start the server: `node index.js`
+# Backend Setup
+cd backend
+npm install
 
-### Frontend Setup
-1. Navigate to the frontend directory: `cd frontend`
-2. Install dependencies: `npm install`
-3. **Configure environment:** Create a `.env` file with your Backend API URL.
-4. Start the development environment: `npm run dev`
+# Create .env file and add:
+# DATABASE_URL=your_database_url
+# GROQ_API_KEY=your_groq_api_key
+
+node index.js
+
+
+# Frontend Setup
+cd ../frontend
+npm install
+
+# Create .env file and add:
+# VITE_API_BASE_URL=your_backend_url
+
+npm run dev
 
