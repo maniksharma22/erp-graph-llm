@@ -35,10 +35,8 @@ You are an ERP Assistant. Follow these STRICT rules for SQL generation:
    - payments (pay): payment_id, customer_id, amount, currency, clearing_date, fiscal_year
    - addresses (a): addressid, businesspartner, streetname, cityname, postalcode, country
    - product_descriptions (pd): product, language, productdescription, productgroup, weightunit
-   - journal_entries (j): accounting_document, reference_document, customer, amount, posting_date
-   - product_storage_locations (psl): plant_id, location_id, product_id, inventory_block_ind
-   - addresses (a): addressid, businesspartner, cityname, streetname, postalcode
-   - plants (pl): plant_id, plant_name
+   - journal_entries (j): accounting_document, reference_document, customer_id, amount, posting_date, fiscal_year, company_code
+
 15. JOINS:
    - s.sales_order_id = d.sales_order_id
    - s.sales_order_id = si.salesorder
@@ -52,92 +50,142 @@ You are an ERP Assistant. Follow these STRICT rules for SQL generation:
    - si.productionplant = pl.plant_id     
    - si.storagelocation = sl.location_id  
    - s.customer_id = a.businesspartner    
+   - j.reference_document = i.invoice_id OR j.reference_document = s.sales_order_id
+   - j.customer_id = c.customer_id
 
-16. For "highest number of billing documents", join i -> d -> si -> pd:
-    SELECT 
-        si.material as product_id, 
-        COALESCE(pd.productdescription, 'Product ID: ' || si.material) as product, 
-        COUNT(DISTINCT i.invoice_id) as billing_count,
-        MAX(si.salesorder) as sales_order_id  -- YE LINE ADD KARO taaki oId mil sake
-    FROM sales_order_items si -- Start from SI to ensure all products are counted
-    LEFT JOIN deliveries d ON si.salesorder = d.sales_order_id 
-    LEFT JOIN invoices i ON d.delivery_id = i.delivery_id 
-    LEFT JOIN product_descriptions pd ON TRIM(si.material::TEXT) = TRIM(pd.product::TEXT) 
-    WHERE (pd.language = 'EN' OR pd.language IS NULL)
-    GROUP BY si.material, pd.productdescription
-    ORDER BY billing_count DESC 
-    LIMIT 10;
+SELECT 
+    si.material as product_id, 
+    COALESCE(pd.productdescription, 'Material ID: ' || si.material) as product, 
+    COUNT(DISTINCT i.invoice_id) as billing_count
+FROM invoices i
+JOIN deliveries d ON TRIM(i.delivery_id::TEXT) = TRIM(d.delivery_id::TEXT)
+JOIN sales_order_items si ON TRIM(d.sales_order_id::TEXT) = TRIM(si.salesorder::TEXT)
+LEFT JOIN product_descriptions pd ON TRIM(si.material::TEXT) = TRIM(pd.product::TEXT) 
+    AND (pd.language = 'EN' OR pd.language IS NULL)
+GROUP BY si.material, pd.productdescription
+ORDER BY billing_count DESC LIMIT 10;
     -- RULE: Invoices table has empty material columns, so we must join through sales_order_items (si) to get the material ID and its description.
     -- RULE: Use 'EN' for language as confirmed from the database.
 
 17. SQL SYNTAX STRICT RULE: If you use 'SELECT DISTINCT', any column in 'ORDER BY' MUST be in the 'SELECT' list. 
     However, for "highest/top" queries, ALWAYS prefer 'GROUP BY' instead of 'DISTINCT'.
 
-18. For "Trace full flow", ALWAYS use LEFT JOIN and do NOT filter by billing_status. 
-    SELECT DISTINCT
-        s.sales_order_id, 
-        d.delivery_id, 
-        i.invoice_id, 
-        j.accounting_document AS journal_entry,
-        s.status AS order_status,
-        s.delivery_status,
-        s.created_at
-    FROM sales_orders s 
-    LEFT JOIN deliveries d ON TRIM(s.sales_order_id::TEXT) = TRIM(d.sales_order_id::TEXT)
-    LEFT JOIN invoices i ON TRIM(d.delivery_id::TEXT) = TRIM(i.delivery_id::TEXT)
-    LEFT JOIN journal_entries j ON TRIM(i.invoice_id::TEXT) = TRIM(j.reference_document::TEXT)
-    ORDER BY s.created_at DESC 
-    LIMIT 5;
-
-19. DYNAMIC LIMIT RULE: 
-    - If the user specifies a number (e.g., "Top 50", "First 100"), use that number as the LIMIT.
-    - If NO number is specified, ALWAYS default to LIMIT 10 for "top/highest" and LIMIT 5 for "flows".
-    - NEVER exceed LIMIT 100 to prevent "Technical Issue".
-
-20. For "Broken or Incomplete flows":
-    -- Identify orders where delivery exists but invoice is missing.
+18. For "Full Lifecycle" or "Trace Flow" or "Trace Full Flow": 
+    ALWAYS use 'LEFT JOIN' starting from sales_orders (s). 
+    This ensures that even if a Delivery or Invoice is missing, the Order and Customer details still show up.
+    
     SELECT 
-        s.sales_order_id, 
-        d.delivery_id, 
-        'Missing Invoice' as issue,
-        s.status as order_status
+    s.sales_order_id, 
+    c.name as customer_name,
+    si.material as product_id,
+    pd.productdescription as product_name,
+    s.status as order_status,
+    CASE WHEN s.delivery_status = 'C' THEN 'Order Dispatched' ELSE 'Pending' END as delivery_status,
+    d.delivery_id,
+    i.invoice_id,
+    j.accounting_document as journal_id,
+    s.created_at
     FROM sales_orders s
-    INNER JOIN deliveries d ON s.sales_order_id = d.delivery_id
-    LEFT JOIN invoices i ON d.delivery_id = i.delivery_id
-    WHERE i.invoice_id IS NULL
-    ORDER BY s.created_at DESC 
-    LIMIT 5;
-
-21. PAGINATION & OFFSET RULE:
-    - If the user asks for "next", "more", or "page 2", use the OFFSET clause.
-    - If the previous query had LIMIT 10, then "Next" means LIMIT 10 OFFSET 10.
-    - If the user specifies "Next 5", use LIMIT 5 and calculate OFFSET based on context.
-    - ALWAYS ensure an ORDER BY clause is present when using OFFSET to keep results consistent.
-
-22. For "Trace full flow" with a specific ID:
-    SELECT DISTINCT
-        s.sales_order_id, 
-        d.delivery_id, 
-        i.invoice_id, 
-        j.accounting_document AS journal_entry,
-        s.status AS order_status,
-        s.billing_status,
-        s.delivery_status,
-        s.created_at
-    FROM sales_orders s
+    LEFT JOIN customers c ON s.customer_id = c.customer_id
+    LEFT JOIN sales_order_items si ON s.sales_order_id = si.salesorder
+    LEFT JOIN product_descriptions pd ON TRIM(si.material::TEXT) = TRIM(pd.product::TEXT)
     LEFT JOIN deliveries d ON TRIM(s.sales_order_id::TEXT) = TRIM(d.sales_order_id::TEXT)
     LEFT JOIN invoices i ON TRIM(d.delivery_id::TEXT) = TRIM(i.delivery_id::TEXT)
-    LEFT JOIN journal_entries j ON TRIM(i.invoice_id::TEXT) = TRIM(j.reference_document::TEXT)
-    WHERE TRIM(s.sales_order_id::TEXT) = 'USER_ID' OR TRIM(i.invoice_id::TEXT) = 'USER_ID'
+    LEFT JOIN journal_entries j ON (TRIM(i.invoice_id::TEXT) = TRIM(j.reference_document::TEXT) OR TRIM(s.sales_order_id::TEXT) = TRIM(j.reference_document::TEXT))
+    WHERE (pd.language = 'EN' OR pd.language IS NULL)
     ORDER BY s.created_at DESC
-    LIMIT 1;
+    LIMIT 5;
+
+19. **DYNAMIC LIMIT RULE:** - Always use **LIMIT 10** for "Top/Highest" or "List" queries.
+    - Always use **LIMIT 5** for "Trace" or "Flow" queries.
+    - NEVER exceed **LIMIT 20** to prevent "Data Too Large" errors.
+
+20. BROKEN FLOW LOGIC (STRICT):
+    - Goal: Find records where the NEXT step is missing.
+    - If user asks for "Delivered but not Billed":
+      SELECT s.sales_order_id, c.name as customer_name, d.delivery_id, s.status, s.created_at
+      FROM sales_orders s
+      JOIN customers c ON s.customer_id = c.customer_id
+      JOIN deliveries d ON s.sales_order_id = d.sales_order_id
+      LEFT JOIN invoices i ON d.delivery_id = i.delivery_id
+      WHERE i.invoice_id IS NULL; 
+    - Example (Billed but NOT Delivered): 
+      SELECT s.sales_order_id, i.invoice_id FROM sales_orders s 
+      INNER JOIN invoices i ON s.sales_order_id = i.sales_order_id 
+      LEFT JOIN deliveries d ON s.sales_order_id = d.sales_order_id 
+      WHERE d.delivery_id IS NULL;
+
+21. JOIN BRIDGE REFERENCE:
+    - s.sales_order_id = d.sales_order_id (Order to Delivery)
+    - d.delivery_id = i.delivery_id (Delivery to Invoice)
+    - i.invoice_id = j.reference_document (Invoice to Journal)
+
+22. SELECT 
+    s.sales_order_id, 
+    c.name as customer_name, 
+    si.material as product_id,
+    pd.productdescription as product_name,
+    d.delivery_id, 
+    i.invoice_id, 
+    j.accounting_document AS journal_id,
+    -- Status mapping updated for all 3 standard SAP/ERP codes
+    CASE 
+        WHEN s.delivery_status = 'C' THEN 'Order Dispatched' 
+        WHEN s.delivery_status = 'B' THEN 'Partially Shipped'
+        ELSE 'In Process' 
+    END as delivery_status,
+    s.status AS order_status,
+    s.created_at
+    FROM sales_orders s
+    LEFT JOIN customers c ON s.customer_id = c.customer_id
+    LEFT JOIN sales_order_items si ON s.sales_order_id = si.salesorder
+    LEFT JOIN product_descriptions pd ON TRIM(si.material::TEXT) = TRIM(pd.product::TEXT)
+    LEFT JOIN deliveries d ON TRIM(s.sales_order_id::TEXT) = TRIM(d.sales_order_id::TEXT)
+    LEFT JOIN invoices i ON TRIM(d.delivery_id::TEXT) = TRIM(i.delivery_id::TEXT)
+    -- Final Fixed Journal Join: Handles Order, Invoice, or Delivery references
+    LEFT JOIN journal_entries j ON (
+        TRIM(j.reference_document::TEXT) = TRIM(i.invoice_id::TEXT) OR 
+        TRIM(j.reference_document::TEXT) = TRIM(s.sales_order_id::TEXT) OR
+        TRIM(j.reference_document::TEXT) = TRIM(d.delivery_id::TEXT)
+    )
+    WHERE (pd.language = 'EN' OR pd.language IS NULL)
+    AND ([ID_OR_NAME_CONDITION])
+    ORDER BY s.created_at DESC
+    LIMIT 20; -- Increased to handle multi-item orders without cutting off the trace
+
+23. TRACING RULE: If a user asks for 'most recent' WITHOUT a specific count, use LIMIT 1. If a count is specified (e.g., 'show 2'), use that count.
+24. MANDATORY COLUMNS & JOINS (CRITICAL): 
+    - Every SQL query involving 'sales_orders' (s) MUST 'LEFT JOIN customers (c) ON s.customer_id = c.customer_id' to fetch 'c.name as customer_name'. 
+    - You MUST select these IDs for Graph Highlighting even if not requested: 
+      s.sales_order_id, s.customer_id, c.name as customer_name, d.delivery_id, i.invoice_id, j.accounting_document as journal_id, si.material as product_id.
+    - Always use table aliases (s, c, d, i, etc.) to avoid ambiguous column errors.
+
+25. 13-ENTITY ALIASING: Always use these short aliases for consistency:
+    s (sales_orders), si (sales_order_items), d (deliveries), i (invoices), c (customers), p (products), pl (plants), sl (storage_locations), psl (product_storage_locations), pay (payments), a (addresses), pd (product_descriptions), j (journal_entries).
+
+26. LIFECYCLE & FLOWS: For any "Trace", "Flow", or "Lifecycle" request, use LEFT JOINs starting from 'sales_orders' to ensure no step is missed. Always ORDER BY s.created_at DESC.
+
+27. CLEAN DATA: Do not return rows where the primary entity ID is missing. Use 'WHERE [ID_COLUMN] IS NOT NULL'.
+28. JOIN INTEGRITY: When joining IDs (e.g., material to product), always use TRIM(column::TEXT) to ensure a match across data types.
+29. STATUS MAPPING (CRITICAL): When selecting status columns, use CASE statements from the CORRECT table:
+    - For delivery_status: CASE WHEN s.delivery_status = 'C' THEN 'Order Dispatched' WHEN s.delivery_status = 'A' THEN 'Pending' ELSE 'In Process' END as delivery_status
+    - For billing_status: CASE WHEN s.billing_status = 'C' THEN 'Invoiced' ELSE 'Pending' END as billing_status
+    - For order status: CASE WHEN s.status = 'C' THEN 'Order Completed' ELSE s.status END as order_status
+30. COLUMN INTEGRITY: 
+    - The 'deliveries' (d) table DOES NOT have 'created_at', 'delivery_status', or 'billing_status'. 
+    - ALWAYS use 's.created_at' for all dates and 's.delivery_status/billing_status' for all status checks.
+    - NEVER try to select 'd.created_at' or 'd.delivery_status'.
+31. JOURNAL MAPPING: If the user asks for "Journal", "Accounting", or "Ledger", query the 'journal_entries' table. Use 'accounting_document' as the primary reference.
 
 `;
 
 const llmService = {
   async runNaturalQuery(userPrompt, chatHistory = []) {
+
     try {
-      const lowerPrompt = userPrompt.toLowerCase().trim();
+      const lowerPrompt = userPrompt.toLowerCase();
+      let limitVal = 5;
+
       const isPagination = lowerPrompt.includes("next") || lowerPrompt.includes("more") || lowerPrompt.includes("page");
 
       // --- GREETINGS ---
@@ -150,7 +198,7 @@ const llmService = {
       }
 
       // --- ERP INTENT CHECK ---
-      const erpKeywords = ["order", "orders", "delivery", "deliveries", "payment", "payments", "inventory", "customer", "customers", "product", "products", "plant", "location", "billing", "invoice", "invoices", "trace", "flow"];
+      const erpKeywords = ["order", "orders", "delivery", "deliveries", "payment", "payments", "inventory", "customer", "customers", "product", "products", "plant", "location", "billing", "invoice", "invoices", "trace", "flow", "journal", "journals", "accounting"];
       const paginationKeywords = ["next", "more", "page", "previous", "show more"];
 
       const isERPQuery = erpKeywords.some((kw) => lowerPrompt.includes(kw)) ||
@@ -166,16 +214,34 @@ const llmService = {
 
       // --- TRACE FLOW PLACEHOLDER FIX ---
       let finalPrompt = userPrompt;
-      const lowerPromptNoSpace = lowerPrompt.replace(/\s/g, "");
-
       const isTraceRequest = lowerPrompt.includes("trace") || lowerPrompt.includes("flow");
+      const isIssueQuery = lowerPrompt.includes("broken") || lowerPrompt.includes("incomplete") || lowerPrompt.includes("missing") || lowerPrompt.includes("issue");
       const hasSpecificId = lowerPrompt.match(/\d{5,}/);
 
-      if (isTraceRequest) {
+      if (hasSpecificId && !isTraceRequest && !isIssueQuery) {
+        finalPrompt = `Fetch all details for Sales Order ID '${hasSpecificId[0]}'. 
+  Include Customer, Delivery, and Invoice if they exist. 
+  Format using Rule 22 (Full Lifecycle).`;
+      }
+      else if (isIssueQuery) {
+        finalPrompt = `STRICT RULE: Only return records where a follow-up document is MISSING. 
+    If user asks for broken flows, return:
+    1. Delivered but NOT billed (d.delivery_id IS NOT NULL AND i.invoice_id IS NULL)
+    2. Billed but NOT delivered (i.invoice_id IS NOT NULL AND d.delivery_id IS NULL)
+    LIMIT results to 10 to avoid overflow.`;
+      }
+      else if (isTraceRequest) {
+        const matchCount = lowerPrompt.match(/\d+/) ||
+          (lowerPrompt.includes("two") ? [2] :
+            lowerPrompt.includes("three") ? [3] : null);
+        limitVal = matchCount ? parseInt(matchCount[0]) : (hasSpecificId ? 1 : 5);
         if (hasSpecificId) {
-          finalPrompt = `Trace the full ERP flow for ID ${hasSpecificId[0]}. Use Rule 22 and return Sales Order, Delivery, Billing, and Journal Entry details.`;
+          finalPrompt = `Trace full ERP lifecycle for ID '${hasSpecificId[0]}'. Use Rule 22.`;
         } else {
-          finalPrompt = "Show me the 5 most recent ERP flows including Sales Order, Delivery, Billing, and Journal Entry as per Rule 18";
+          
+          finalPrompt = `Trace the ERP flows using Rule 18. 
+        CRITICAL: I need exactly ${limitVal} UNIQUE Sales Order IDs.
+        Your SQL MUST use: WHERE s.sales_order_id IN (SELECT sales_order_id FROM sales_orders ORDER BY created_at DESC LIMIT ${limitVal})`;
         }
       }
 
@@ -187,12 +253,12 @@ const llmService = {
         messages: [
           {
             role: "system",
-            content: SCHEMA_CONTEXT + (isPagination ? "\nSTRICT RULE: The user is asking for more/next results. You MUST use OFFSET. If the previous limit was 10, use OFFSET 10. If the user asks for 'next 5', use LIMIT 5 OFFSET 10." : "")
+            content: SCHEMA_CONTEXT + (isPagination ? "\nSTRICT RULE: Use OFFSET." : "")
           },
           ...chatHistory,
           { role: "user", content: finalPrompt },
         ],
-        model: "llama-3.1-8b-instant",
+        model: "llama-3.3-70b-versatile",
         temperature: 0.1,
       });
 
@@ -231,57 +297,136 @@ const llmService = {
           nodeIds: [],
         };
       }
+
+      // --- DYNAMIC DATA ROUTING ---
+      const flatEntities = ["customer", "product", "plant", "location", "address", "payment"];
+      const isFlatQuery = flatEntities.some(entity => lowerPrompt.includes(entity));
+      const isFlowQuery = lowerPrompt.includes("order") || lowerPrompt.includes("trace") || lowerPrompt.includes("flow");
+
+      let mergedDataRows;
+      if (isFlatQuery && !isFlowQuery) {
+        mergedDataRows = result.rows;
+      } else {
+
+        const grouped = result.rows.reduce((acc, row, index) => {
+          const id =
+            row.sales_order_id ||
+            row.invoice_id ||
+            row.delivery_id ||
+            row.accounting_document ||
+            row.customer_id ||
+            row.product_id ||
+            row.material ||
+            row.payment_id ||
+            row.plant_id ||
+            row.location_id ||
+            row.addressid ||
+            `entity-group-${index}`;
+          if (!acc[id]) {
+            acc[id] = { ...row, items: [] };
+          }
+          if (row.product_id || row.material) {
+            acc[id].items.push({
+              product_id: row.product_id || row.material,
+              product_name: row.product_name || row.productdescription,
+              amount: row.netamount || row.amount
+            });
+          }
+          return acc;
+        }, {});
+        mergedDataRows = Object.values(grouped);
+        console.log("UNIQUE ORDERS FOUND:", mergedDataRows.length);
+      }
+
+
+
+      const finalDataForAI = mergedDataRows.map(row => {
+        const cleanRow = {};
+        const allowedFields = [
+          'sales_order_id', 'customer_name', 'name', 'status', 'delivery_status',
+          'billing_status', 'order_status', 'created_at', 'delivery_id',
+          'invoice_id', 'journal_id', 'accounting_document',
+          'product', 'product_id', 'billing_count', 'product_name', 'amount'
+        ];
+
+        Object.keys(row).forEach(key => {
+          let val = row[key];
+          if (val === null || val === undefined || val === "") return;
+          if (allowedFields.includes(key)) cleanRow[key] = val;
+        });
+
+        if (!lowerPrompt.includes("trace") && !lowerPrompt.includes("flow")) {
+          delete cleanRow.items;
+        } else if (row.items) {
+          cleanRow.items = row.items.slice(0, 2);
+        }
+
+        return cleanRow;
+      }).slice(0, 5);
+
       const humanCompletion = await groq.chat.completions.create({
         messages: [
           {
             role: "system",
+            content: `You are a Senior ERP Analyst. Provide a professional report based ONLY on the provided 'Database Data'.
 
-            content: `You are a Senior ERP Analyst. Provide a professional, structured response.
-      
-     STRICT RULES:
-         1. Start with a professional introduction.
-         2. Use Numbers with brackets like **1)**, **2)** for the main entity.
-         3. FOLLOWED BY TWO SPACES, put the main detail (e.g., **Product:** [Name]) on the SAME LINE.
-         4. ALL other details (e.g., Billing Count) MUST be on a NEW LINE.
-         5. INDENT the second line with 5 spaces for a clean look.
-         6. NO BULLET POINTS (•) unless it's a sub-list.
-         7. Use BOLD for headers like **Product:** and **Amount:**.
-         8. SINGLE SPACING within an item.
-         9. DOUBLE SPACING (Blank line) between item 1 and item 2.
-         10. FULL DATA: Display every single record from the database.
-         11. HIERARCHY: Parent entity on top, child details indented below.
-         12. DATA COMPLETENESS: Do not skip any rows.
-         13. If a value is null, just skip that line.
-         14. Always start the next numbered list from a new line.
-         15. ALIGNMENT: Ensure the text looks like a clean ERP report.
-         
-         FORMAT EXAMPLE:
-         **1)** **Product:** FACESERUM 30ML VIT C
-                **Billing Count:** 2
-      
-         **2)** **Product:** SUNSCREEN GEL SPF50-PA+++ 50ML
-                **Billing Count:** 2`
+           STRICT RULES (30):
+1. **NO BACKEND TALK:** Never mention "Database", "JSON", "Rows", or "Missing data".
+2. **MANDATORY BOLD LABELS:** Every label must be bold (e.g., **Sales Order:**, **Customer:**).
+3. **ONE NUMBER PER ORDER:** Use 1), 2) etc. only for unique Sales Order IDs.
+4. **HIERARCHY:** Indent Delivery, Invoice, and Journal IDs under the Sales Order.
+5. **STRICT NULL FILTER:** If a value is missing/null in the JSON, DELETE the entire line and label.
+6. **SILENT NULL FILTER:** If a specific field is missing in the JSON (e.g., no 'product' name), DO NOT mention that field at all. Never write "Not Available".
+7. **NO PLACEHOLDERS:** Never use "Item A", "Product B", or dummy IDs. If the product name/ID is missing from the data, DO NOT list the product field at all.
+8. 8. **TRACE INTEGRITY:** Show the trace flow ONLY ONCE per unique Sales Order. 
+   - Format: **Trace:** [Del ID] → [Inv ID] → [Jour ID].
+   - If a middle document is missing, keep the arrow: [Del ID] → → [Jour ID].
+   - **CLEAN END:** If the flow ends prematurely (e.g., no Invoice after Delivery), DO NOT show trailing arrows. 
+     (BAD: 80737722 → → | GOOD: 80737722)
+9. **CLEAN START:** Start directly with "Here is the report:" or "ERP Analysis Report:".
+10. **STRICT DATA ADHERENCE:** Do not invent or "hallucinate" any IDs, names, or items. Use ONLY the literal strings provided in the 'Database Data'.
+11. **DATE FORMAT:** Always use YYYY-MM-DD (remove time stamps).
+12. **NO EXAMPLES:** Never use dummy names like "Bradley-Kelley" unless present in JSON.
+13. **ISSUE HIGHLIGHTING:** If Rule 20 is used, add **Issue:** [Description].
+14. **VERTICAL COMPACTNESS:** No empty lines between data fields of the same item.
+15. **DOUBLE SPACING:** Use one blank line between Item 1) and Item 2).
+16. **GHOST SPACE PREVENTION:** Shift next lines up immediately if a field is missing.
+17. **CUSTOMER PRIORITY:** Always show Customer Name; if missing, show Customer ID.
+18. **NO BULLETS:** Use only numbers (1, 2) for main items, no dots or dashes.
+19. **CURRENCY:** Include currency (USD/INR) next to amounts if available.
+20. **AGGREGATION ONLY:** If 'billing_count' exists in the data, show ONLY a list: 1) **Product:** [Name] | **Count:** [Value]. DO NOT attempt a Trace flow for this.
+21. **ABSOLUTE NO REPETITION:** If multiple rows in the data represent the same Sales Order, you MUST merge them into a single numbered item in your report. Do not repeat the same Sales Order ID.
+22. **ORDER STATUS:** Map 'C' to "Completed", 'A' to "Open", 'B' to "In Progress".
+23. **DELIVERY STATUS:** Map 'C' to "Order Dispatched", 'A' to "Pending".
+24. **SINGLE SOURCE:** Only use data from the 'Database Data' section of the prompt.
+25. **NO TRUNCATION:** Display every unique record found in the JSON.
+26. **INDENTATION:** Use 2 spaces for indented lines (Delivery, Invoice, etc.).
+27. **ITEM ALIGNMENT:** Ensure all bold labels are aligned for readability.
+28. **STRICT HIERARCHY:** If no Sales Order ID exists, use the next highest ID (e.g., Invoice ID).
+29. **FINANCIAL DATA:** Journal IDs must be labeled as **Journal ID:** or **Accounting Doc:**.
+30. **FINAL CHECK:** If JSON is empty, respond: "No records found for your request."
+31. **NO EXPLANATIONS:** Do not explain your logic or how you found the data."
+32. **BOLD NUMBERING:** Use **1)**, **2)**, etc. (bolded) only for unique Sales Order IDs or main list items.
+32. Show exactly ${limitVal} unique items/orders in the report.`
           },
           {
             role: "user",
-            content: `User Question: ${userPrompt} \n Database Data: ${JSON.stringify(result.rows)}`
+            content: `User Question: ${userPrompt} 
+      Database Data: ${JSON.stringify(finalDataForAI)}`
           },
         ],
-        model: "llama-3.1-8b-instant",
+        model: "llama-3.3-70b-versatile",
         temperature: 0.1,
-        max_tokens: 4096,
       });
 
-      const finalAnswer = humanCompletion.choices[0].message.content
-        .replace(/\n\s*\n/g, '\n\n')
-        .trim();
+      const finalAnswer = humanCompletion.choices[0].message.content.trim();
 
       console.log("DEBUG ROW DATA:", result.rows[0]);
 
       // --- FORMAT RESPONSE & NODE IDS ---
       const nodeIds = new Set();
       result.rows.forEach((row) => {
-        const clean = (val) => val ? String(val).trim() : null;
+        const clean = (val) => (val && val !== 'null' && val !== 'undefined') ? String(val).trim() : null;
 
         const pId = clean(row.product_id || row.material || row.product);
         const oId = clean(row.sales_order_id || row.salesorder || row.order_id);
@@ -297,14 +442,14 @@ const llmService = {
         const pName = clean(row.product_name || row.product || row.productdescription);
 
         // Product & Product Descriptions
-       if (pId) {
+        if (pId) {
           nodeIds.add(pId);
           nodeIds.add(`prod-${pId}`);
 
           if (oId) {
             nodeIds.add(`prod-${oId}-${pId}`);
           } else {
-            nodeIds.add(`prod-any-${pId}`); 
+            nodeIds.add(`prod-any-${pId}`);
           }
         }
         if (pName) {
@@ -378,6 +523,7 @@ const llmService = {
         nodeIds: Array.from(nodeIds),
       };
     } catch (error) {
+      console.error("DETAILED ERROR:", error);
       return {
         success: false,
         answer: "The data requested is too large to summarize right now. Please try a more specific query, like 'Show top 5 billing documents' or 'Details for Order 740506'.",
