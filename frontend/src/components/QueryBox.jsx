@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { API_BASE_URL } from "../config";
+import { API_BASE_URL } from "../config.js";
 
 function QueryBox({ setSelectedNodeInGraph }) {
   const [question, setQuestion] = useState("");
