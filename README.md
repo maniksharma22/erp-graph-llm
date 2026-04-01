@@ -15,6 +15,13 @@ https://erp-graph-llm.vercel.app/
 - Cross-Module Insights: Connects data across different ERP modules seamlessly.
 - Mini Graph Navigation: Includes a MiniMap for quick navigation across large graphs.
 - Clean UI: Simple, fast, and user-friendly interface for better analysis.
+
+## How it Works
+The system follows a seamless data flow to transform natural language into visual insights:
+1. **User Query:** User asks a question in plain English (e.g., "Show me all orders from last month").
+2. **AI Processing:** Groq AI (Llama 3.3) translates the English query into a structured SQL command.
+3. **Data Retrieval:** The system executes the SQL query against the PostgreSQL database.
+4. **Graph Rendering:** ReactFlow dynamically updates the graph, highlighting relevant nodes and connections.
   
 ## Tech Stack
 - Frontend: React.js (Deployed on Vercel)
