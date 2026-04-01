@@ -13,6 +13,7 @@ function App() {
   const [graphData, setGraphData] = useState(null);
   const [actualCount, setActualCount] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [matchedNodes, setMatchedNodes] = useState([]);
 
   const graphRef = useRef(null);
 
@@ -29,27 +30,35 @@ function App() {
     loadGraph();
   }, []);
 
-  const handleHighlightFromChat = useCallback((nodeIds) => {
-    if (!nodeIds || !Array.isArray(nodeIds) || nodeIds.length === 0) {
-      setHighlightIds([]);
-      setCurrentIndex(0);
-      setCurrentNodeId(null);
-      return;
+
+ const handleHighlightFromChat = useCallback((nodeIds) => {
+  if (!nodeIds || nodeIds.length === 0) {
+    setHighlightIds([]);
+    setMatchedNodes([]);
+    return;
+  }
+
+  const cleanIds = nodeIds.map(id => String(id).trim());
+  setHighlightIds(cleanIds);
+
+  setTimeout(() => {
+    if (graphRef.current?.focusNodes) {
+      const found = graphRef.current.focusNodes(cleanIds); 
+      if (found && found.length > 0) {
+        setMatchedNodes(found); 
+        setCurrentIndex(0);    
+        setCurrentNodeId(found[0].id); 
+      }
     }
-    const cleanIds = nodeIds.map(id => String(id).trim());
-    setHighlightIds(cleanIds);
-    setShowOverlay(true);
-    setCurrentIndex(0);
-    setCurrentNodeId(cleanIds[0]);
-    if (graphRef.current?.focusNodes) graphRef.current.focusNodes(cleanIds);
-  }, [graphData]);
+  }, 100); 
+}, []);
 
   const goNext = () => {
-    if (currentIndex + 1 < highlightIds.length) {
+    if (currentIndex + 1 < matchedNodes.length) {
       const nextIdx = currentIndex + 1;
       setCurrentIndex(nextIdx);
-      setCurrentNodeId(highlightIds[nextIdx]);
-      if (graphRef.current?.focusNext) graphRef.current.focusNext();
+      setCurrentNodeId(matchedNodes[nextIdx].id);
+      if (graphRef.current?.focusNode) graphRef.current.focusNode(matchedNodes[nextIdx].id);
     }
   };
 
@@ -57,8 +66,8 @@ function App() {
     if (currentIndex - 1 >= 0) {
       const prevIdx = currentIndex - 1;
       setCurrentIndex(prevIdx);
-      setCurrentNodeId(highlightIds[prevIdx]);
-      if (graphRef.current?.focusPrev) graphRef.current.focusPrev();
+      setCurrentNodeId(matchedNodes[prevIdx].id);
+      if (graphRef.current?.focusNode) graphRef.current.focusNode(matchedNodes[prevIdx].id);
     }
   };
 
@@ -97,12 +106,27 @@ function App() {
 
           {graphData && <GraphView ref={graphRef} view="detailed" data={graphData} highlightIds={highlightIds} currentNodeId={currentNodeId} showOverlay={showOverlay} onCountChange={setActualCount} />}
 
-          {highlightIds.length > 0 && (
+          {highlightIds.length > 0 && matchedNodes.length > 1 && (
             <div style={styles.navContainer}>
               <div style={styles.navBtns}>
-                <button onClick={goPrev} disabled={currentIndex === 0} style={navBtnStyle}>Prev</button>
-                <span style={styles.navCount}>{currentIndex + 1} / {highlightIds.length}</span>
-                <button onClick={goNext} disabled={currentIndex >= highlightIds.length - 1} style={navBtnStyle}>Next</button>
+                <button
+                  onClick={goPrev}
+                  disabled={currentIndex === 0}
+                  style={{ ...navBtnStyle, opacity: currentIndex === 0 ? 0.5 : 1 }}
+                >
+                  Prev
+                </button>
+
+                {/* Divider line for clean look */}
+                <div style={{ width: "1px", height: "16px", background: "#e2e8f0" }} />
+
+                <button
+                  onClick={goNext}
+                  disabled={currentIndex >= matchedNodes.length - 1}
+                  style={{ ...navBtnStyle, opacity: currentIndex >= matchedNodes.length - 1 ? 0.5 : 1 }}
+                >
+                  Next
+                </button>
               </div>
             </div>
           )}
@@ -130,8 +154,17 @@ function App() {
 }
 
 const btnStyle = { display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "12px", cursor: "pointer", fontWeight: "600" };
-const navBtnStyle = { padding: "4px 12px", borderRadius: "6px", border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: "12px" };
-
+const navBtnStyle = {
+  padding: "6px 16px",
+  borderRadius: "6px",
+  border: "none",
+  background: "transparent",
+  cursor: "pointer",
+  fontSize: "13px",
+  fontWeight: "600",
+  color: "#1a1a1a",
+  transition: "all 0.2s ease"
+};
 const styles = {
   container: { height: "100vh", display: "flex", flexDirection: "column", background: "#f8fafc", fontFamily: "Inter, sans-serif" },
   header: { height: "52px", background: "#fff", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", padding: "0 20px" },
@@ -145,7 +178,7 @@ const styles = {
   chatHeaderArea: { padding: "15px 20px 10px 20px", borderBottom: "1px solid #f1f5f9" },
   chatTitleSection: { marginBottom: "12px", paddingBottom: "10px", borderBottom: "1px solid #f1f5f9" },
   chatTitle: { fontSize: "18px", margin: 0, fontWeight: "600", color: "#1a1a1a" },
-  chatSubtitle: { fontSize: "14px", margin: "4px 0 0 0", color: "#70757a" },
+  chatSubtitle: { fontSize: "13px", margin: "4px 0 0 0", color: "#70757a" },
   agentInfoRow: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" },
   avatarBox: { width: "40px", height: "40px", borderRadius: "50%", overflow: "hidden", border: "1px solid #eee" },
   avatarImg: { width: "100%", height: "100%", objectFit: "cover" },
@@ -153,7 +186,16 @@ const styles = {
   agentRoleText: { fontSize: "13px", color: "#70757a" },
   welcomeMessage: { fontSize: "16px", color: "#1a1a1a", lineHeight: "1.5", marginTop: "12px" },
   navContainer: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", zIndex: 10 },
-  navBtns: { background: "#fff", padding: "8px 16px", borderRadius: "50px", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" },
+  navBtns: {
+    background: "#fff",
+    padding: "6px",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)"
+  },
   navCount: { fontSize: "13px", fontWeight: "700" },
   bottomSection: { flex: 1, overflow: "hidden" },
 };
