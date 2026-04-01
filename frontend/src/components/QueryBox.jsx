@@ -34,7 +34,10 @@ function QueryBox({ setSelectedNodeInGraph }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: userMsg,
-          history: messages.map(m => ({ role: m.type === "user" ? "user" : "assistant", content: m.text }))
+          history: messages.map(m => ({
+            role: m.type === "user" ? "user" : "assistant",
+            content: m.text
+          }))
         }),
       });
 
@@ -43,7 +46,7 @@ function QueryBox({ setSelectedNodeInGraph }) {
       }
 
       const data = await res.json();
-      console.log(">>> BACKEND SE KYA AAYA:", data);
+      console.log(">>> RESPONSE FROM BACKEND:", data);
 
       // --- CRITICAL SAFETY CHECK ---
       const finalResponse = data.answer || "I'm sorry, I couldn't process that request. Please try again.";
@@ -52,7 +55,10 @@ function QueryBox({ setSelectedNodeInGraph }) {
       setMessages((prev) => [...prev, { type: "ai", text: aiText }]);
 
       if (data.nodeIds && Array.isArray(data.nodeIds)) {
-        setSelectedNodeInGraph(data.nodeIds);
+        const cleanIds = data.nodeIds.map(id => String(id).trim());
+        console.log(">>> Sending IDs to App:", cleanIds);
+        console.log("DEBUG: Array length is", cleanIds.length);
+        setSelectedNodeInGraph(cleanIds);
       } else {
         setSelectedNodeInGraph([]);
       }
@@ -142,12 +148,12 @@ const styles = {
     border: "1px solid #eee",
     lineHeight: "1.6",
     whiteSpace: "pre-line",
-    fontSize:"16px"
+    fontSize: "16px"
   },
   avatar: { width: "28px", height: "28px", borderRadius: "50%" },
   userAvatar: { width: "28px", height: "28px", borderRadius: "50%" },
   inputWrapper: { padding: "15px", background: "#fff", borderTop: "1px solid #eee" },
-  inputCard: { border: "1px solid #e5e7eb", borderRadius: "14px", background: "#fff",minHeight: "140px",display: "flex",flexDirection: "column" },
+  inputCard: { border: "1px solid #e5e7eb", borderRadius: "14px", background: "#fff", minHeight: "140px", display: "flex", flexDirection: "column" },
   statusHeader: { background: "#f9fafb", padding: "8px 12px", display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid #eee" },
   dot: { width: "8px", height: "8px", background: "#22c55e", borderRadius: "50%" },
   dotPulse: { width: "8px", height: "8px", background: "#f59e0b", borderRadius: "50%", animation: "pulse 1.5s infinite" },
