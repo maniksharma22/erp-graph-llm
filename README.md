@@ -1,60 +1,54 @@
 # ERP Graph Query System (AI LLM + Graph Visualization)
 
-A production‑ready web application that visualizes an ERP dataset as an interactive graph and lets users query it using natural language. The system dynamically translates questions into structured queries and highlights relevant nodes in the graph, with AI‑generated responses using Groq AI.
+A production‑ready web application that visualizes an ERP dataset as an interactive graph and lets users query it using natural language. The system dynamically translates questions into structured queries and highlights relevant nodes in the graph, with AI‑generated responses using Groq AI
 
-## Live Demo
+## 🔗Live Demo:
 
 https://erp-graph-llm.vercel.app/
 
 ## Features
-- **Interactive ERP Graph:** Visualize connected ERP data in an easy-to-understand graph.
-- **Ask in Plain English:** Query your data naturally using AI-powered responses.
-- **Smart Data Grouping:** Combines related records into meaningful business entities.
-- **End-to-End Flow Tracking:** Trace complete order lifecycle from sales to accounting.
-- **Query-Based Highlighting:** Automatically highlights relevant nodes based on user queries.
-- **Cross-Module Insights:** Connects data across different ERP modules seamlessly.
-- **Mini Graph Navigation:** Includes a MiniMap for quick navigation across large graphs.
-- **Clean UI:** Simple, fast, and user-friendly interface for better analysis.
+- **Interactive ERP Graph:** Visualize connected ERP data in an easy-to-understand graph
+- **Ask in Plain English:** Query your data naturally using AI-powered responses
+- **Smart Data Grouping:** Combines related records into meaningful business entities
+- **End-to-End Flow Tracking:** Trace complete order lifecycle from sales to accounting
+- **Query-Based Highlighting:** Automatically highlights relevant nodes based on user queries
+- **Cross-Module Insights:** Connects data across different ERP modules seamlessly
+- **Mini Graph Navigation:** Includes a MiniMap for quick navigation across large graphs
+- **Clean UI:** Simple, fast, and user-friendly interface for better analysis
 
 ## How it Works
 The system follows a seamless data flow to transform natural language into visual insights:
-1. **User Query:** User asks a question in plain English (e.g., "Show me all orders from last month").
-2. **AI Processing:** Groq AI (Llama 3.3) translates the English query into a structured SQL command.
-3. **Data Retrieval:** The system executes the SQL query against the PostgreSQL database.
-4. **Graph Rendering:** ReactFlow dynamically updates the graph, highlighting relevant nodes and connections.
+1. **User Query:** User asks a question in plain English (e.g., "Show me all orders from last month")
+2. **AI Processing:** Groq AI (Llama 3.3) translates the English query into a structured SQL command
+3. **Data Retrieval:** The system executes the SQL query against the PostgreSQL database
+4. **Graph Rendering:** ReactFlow dynamically updates the graph, highlighting relevant nodes and connections
   
 ## Tech Stack
-- **Frontend:** React.js (Deployed on Vercel)
-- **Backend:** Node.js and Express.js (Hosted on Render)
-- **Database:** PostgreSQL (Relational Data Storage)
-- **AI Engine:** Groq AI SDK (Llama 3.3 for SQL Generation and Natural Language Processing)
-- **Layout Engine:** Dagre (Hierarchical Directed Graph with LR Flow)
-- **Graph Visualization:** Reactflow (Dynamic Node and Edge Rendering)
-- **Environment Management:** Dotenv for secure API and DB credential handling
+- **Frontend:** `React.js` (Deployed on Vercel)
+- **Backend:** `Node.js` and `Express.js` (Hosted on Render)
+- **Database:** `PostgreSQL` (Relational Data Storage)
+- **AI Engine:** `Groq AI SDK`(Llama 3.3 for SQL Generation and Natural Language Processing)
+- **Layout Engine:** `Dagre` (Hierarchical Directed Graph with LR Flow)
+- **Graph Visualization:** `Reactflow` (Dynamic Node and Edge Rendering)
+- **Environment Management:** `Dotenv` for secure API and DB credential handling
   
 ## Performance & Optimization
-- **Optimized AI Prompts:** Controls data size to stay within limits and keep responses fast.
-- **Efficient Queries:** Uses filters and limits to avoid slow loading and heavy data.
-- **Stable Performance:** Handles API limits smoothly for consistent results.
-- **Smart Layout:** Uses Dagre to organize graph neatly even with large data.
+- **Optimized AI Prompts:** Controls data size to stay within limits and keep responses fast
+- **Efficient Queries:** Uses filters and limits to avoid slow loading and heavy data
+- **Stable Performance:** Handles API limits smoothly for consistent results
+- **Smart Layout:** Uses Dagre to organize graph neatly even with large data
 
 ## Installation
 
 ### Backend Setup
-- Navigate to the backend directory:
-  cd backend
-- Install dependencies:
-  npm install
-- Configure environment:
-  Create a .env file with your Database URL and Groq API Key.
-- Start the server:
-  node index.js
+1. Navigate to the backend directory: `cd backend`
+2. Install dependencies: `npm install`
+3. **Configure environment:** Create a `.env` file with your Database URL and Groq API Key.
+4. Start the server: `node index.js`
 
 ### Frontend Setup
-- Navigate to the frontend directory:
-  cd frontend
-- Install dependencies:
-  npm install
-- Start the development environment:
-  npm run dev
+1. Navigate to the frontend directory: `cd frontend`
+2. Install dependencies: `npm install`
+3. **Configure environment:** Create a `.env` file with your Backend API URL.
+4. Start the development environment: `npm run dev`
 
