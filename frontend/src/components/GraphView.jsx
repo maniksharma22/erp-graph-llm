@@ -7,7 +7,8 @@ import ReactFlow, {
   useReactFlow,
   MiniMap,
   Handle,
-  Position
+  Position,
+  BezierEdge
 } from "reactflow";
 import dagre from "dagre";
 import "reactflow/dist/style.css";
@@ -17,14 +18,16 @@ const NODE_HEIGHT = 70;
 
 const matchNode = (node, highlightIds) => {
   if (!highlightIds || highlightIds.length === 0) return false;
+
   const nodeId = String(node.id).toLowerCase();
+  const nodeValue = String(node.data?.value || "").toLowerCase();
 
   return highlightIds.some(hId => {
     const search = String(hId).toLowerCase().trim();
-    // Strict match: exact ID or ID ends with search
-    return nodeId === search || nodeId.endsWith(search);
+    return nodeId.includes(search) || nodeValue.includes(search);
   });
 };
+
 const CustomNode = ({ data, style }) => (
   <div style={{
     ...style,
@@ -48,6 +51,9 @@ const CustomNode = ({ data, style }) => (
 );
 
 const nodeTypes = { custom: CustomNode };
+const edgeTypes = {
+  customBezier: BezierEdge,
+};
 
 const layoutElements = (nodes, edges) => {
   const dagreGraph = new dagre.graphlib.Graph();
@@ -103,11 +109,11 @@ const createEdge = (source, target) => ({
   id: `e-${source}-${target}`,
   source,
   target,
-  type: 'bezier',
+  type: 'customBezier',
   animated: true,
   style: {
     stroke: "#94a3b8",
-    strokeWidth: 2
+    strokeWidth: 2,
   },
   markerEnd: {
     type: MarkerType.ArrowClosed,
@@ -117,9 +123,10 @@ const createEdge = (source, target) => ({
 
 const GraphContent = forwardRef((props, ref) => {
   const { highlightIds = [], currentNodeId, onCountChange, showOverlay = true } = props;
-  const relevantHighlightIds = highlightIds
-  .filter(id => String(id).startsWith('prod-'))
-  .map(id => String(id).trim());
+  const relevantHighlightIds = useMemo(() =>
+    highlightIds.map(id => String(id).trim()),
+    [highlightIds]
+  );
   const { fitView, setCenter, getNode } = useReactFlow();
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -157,7 +164,7 @@ const GraphContent = forwardRef((props, ref) => {
 
   const fetchData = useCallback(async () => {
     try {
-      const response = await fetch("https://erp-graph-llm.onrender.com/api/graph?view=detailed");
+      const response = await fetch("http://localhost:10000/api/graph?view=detailed");
       const data = await response.json();
       if (!data || !data.orders) return;
 
@@ -191,9 +198,12 @@ const GraphContent = forwardRef((props, ref) => {
       );
 
       const ordersToRender = relevantHighlightIds.length > 0
-        ? data.orders.filter(o => relevantHighlightIds.includes(`order-${o.salesOrder}`))
+        ? data.orders.filter(o =>
+          relevantHighlightIds.some(id =>
+            id.includes(String(o.salesOrder)) || id.includes(String(o.soldToParty))
+          )
+        )
         : data.orders.slice(0, 15);
-
       ordersToRender.forEach((order) => {
         const oId = String(order.salesOrder);
         const cId = String(order.soldToParty);
@@ -293,27 +303,21 @@ const GraphContent = forwardRef((props, ref) => {
   }, [highlightIds]);
 
   useImperativeHandle(ref, () => ({
+    focusNodes: (ids) => {
+      const cleanIds = ids.map(id => String(id).trim());
+      const matched = nodes.filter(n => matchNode(n, cleanIds));
+      if (matched.length > 0) {
+        fitView({ nodes: matched, padding: 0.4, duration: 400 });
+        setHoveredNode(matched[0]);
+      }
+      return matched;
+    },
     focusNode: (nodeId) => {
-      const node = getNode(nodeId);
-      if (node) setCenter(node.position.x + NODE_WIDTH / 2, node.position.y + NODE_HEIGHT / 2, { zoom: 1.6, duration: 800 });
-    },
-    focusNext: () => {
-      if (highlightedNodesList.length === 0) return;
-      const nextIndex = (focusIndex + 1) % highlightedNodesList.length;
-      setFocusIndex(nextIndex);
-      const n = highlightedNodesList[nextIndex];
-
-      setHoveredNode(n);
-      setCenter(n.position.x + NODE_WIDTH / 2, n.position.y + NODE_HEIGHT / 2, { zoom: 1.6, duration: 800 });
-    },
-    focusPrev: () => {
-      if (highlightedNodesList.length === 0) return;
-      const prevIndex = (focusIndex - 1 + highlightedNodesList.length) % highlightedNodesList.length;
-      setFocusIndex(prevIndex);
-      const n = highlightedNodesList[prevIndex];
-
-      setHoveredNode(n); // Crucial: This moves the overlay table
-      setCenter(n.position.x + NODE_WIDTH / 2, n.position.y + NODE_HEIGHT / 2, { zoom: 1.6, duration: 800 });
+      const node = nodes.find(n => n.id === nodeId);
+      if (node) {
+        setCenter(node.position.x + NODE_WIDTH / 2, node.position.y + NODE_HEIGHT / 2, { zoom: 1.6, duration: 800 });
+        setHoveredNode(node);
+      }
     },
     getNodeScreenPos: (nodeId) => {
       const el = document.querySelector(`[data-id="${nodeId}"]`);
@@ -326,44 +330,41 @@ const GraphContent = forwardRef((props, ref) => {
   }));
 
   const styledNodes = useMemo(() => {
-    const hasHighlights = highlightIds && highlightIds.length > 0;
-
+    const hasHighlights = relevantHighlightIds.length > 0;
     return nodes.map((n) => {
       const isHighlighted = hasHighlights && matchNode(n, relevantHighlightIds);
-
-      const isFocused = n.id === currentNodeId;
       return {
         ...n,
         style: {
           ...n.style,
-          opacity: !hasHighlights ? 1 : (isHighlighted ? 1 : 0.1),
-          zIndex: isHighlighted ? 1000 : 1,
-          boxShadow: isHighlighted ? `0 0 20px ${n.data.accentColor}` : "none",
-          border: isHighlighted ? `3px solid ${n.data.accentColor}` : n.style.border
+          opacity: !hasHighlights ? 1 : (isHighlighted ? 1 : 0.05),
+          boxShadow: isHighlighted ? `0 0 25px ${n.data.accentColor}` : "none",
+          border: isHighlighted ? `3px solid ${n.data.accentColor}` : n.style.border,
+          zIndex: isHighlighted ? 1000 : 1
         },
       };
     });
-  }, [nodes, highlightIds, currentNodeId]);
+  }, [nodes, relevantHighlightIds]);
 
   const styledEdges = useMemo(() => {
-    const hasHighlights = highlightIds && highlightIds.length > 0;
+    const hasHighlights = relevantHighlightIds.length > 0;
     return edges.map((e) => {
-      const isSourceActive = relevantHighlightIds.includes(e.source);
-      const isTargetActive = relevantHighlightIds.includes(e.target);
-      const isPathActive = hasHighlights && isSourceActive && isTargetActive;
+      const sNode = nodes.find(n => n.id === e.source);
+      const tNode = nodes.find(n => n.id === e.target);
+      const isPathActive = hasHighlights && matchNode(sNode, relevantHighlightIds) && matchNode(tNode, relevantHighlightIds);
 
       return {
         ...e,
-        animated: isPathActive || highlightIds.length === 0,
+        animated: isPathActive,
         style: {
-          ...e.style,
-          stroke: isPathActive ? "#3b82f6" : "#94a3b8",
-          strokeWidth: isPathActive ? 3 : 2,
-          opacity: highlightIds.length === 0 ? 1 : (isPathActive ? 1 : 0),
+          stroke: isPathActive ? "#3b82f6" : (hasHighlights ? "#f1f5f9" : "#cbd5e1"),
+          strokeWidth: isPathActive ? 4 : 2,
+          opacity: hasHighlights ? (isPathActive ? 1 : 1.8) : 1.6,
         },
       };
     });
-  }, [edges, highlightIds]);
+  }, [edges, nodes, relevantHighlightIds]);
+
   return (
     <div
       style={{ width: "100%", height: "100%", position: "relative", flex: 1 }}
@@ -380,6 +381,7 @@ const GraphContent = forwardRef((props, ref) => {
           nodes={styledNodes}
           edges={styledEdges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onNodeMouseEnter={(_, node) => setHoveredNode(node)}
           onNodeMouseLeave={() => { if (highlightIds.length === 0) setHoveredNode(null); }}
           onNodeClick={(event, node) => setCenter(node.position.x + NODE_WIDTH / 2, node.position.y + NODE_HEIGHT / 2, { zoom: 1.5, duration: 800 })}
@@ -397,56 +399,55 @@ const GraphContent = forwardRef((props, ref) => {
         </ReactFlow>
       </div>
       {hoveredNode && showOverlay && (
-        <div
-          style={{
-            position: "absolute",
-            left: highlightIds.length > 0
-              ? `calc(50% + ${NODE_WIDTH / 2 + 40}px)`
-              : `${cursorRef.current.x + 20}px`,
-            top: highlightIds.length > 0
-              ? `40%`
-              : `${cursorRef.current.y + 20}px`,
-
-            width: "340px",
-            background: "#ffffff",
-            borderRadius: "16px",
-            boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
-            padding: "18px",
-            border: `1.5px solid ${hoveredNode.data.accentColor}`,
-            zIndex: 9999,
-            fontSize: "13px",
-            lineHeight: "1.5",
-            transition: "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)"
-          }}
-        >
-          <div style={{ fontWeight: "700", color: hoveredNode.data.accentColor, marginBottom: "8px" }}>
-            {hoveredNode.data.type} — {hoveredNode.data.value}
+        <div style={{
+          position: "fixed",
+          left: (document.querySelector(`[data-id="${hoveredNode.id}"]`)?.getBoundingClientRect().right || 0) + 10,
+          top: (document.querySelector(`[data-id="${hoveredNode.id}"]`)?.getBoundingClientRect().top || 0) - 20,
+          zIndex: 9999,
+          display: "flex",
+          pointerEvents: "none"
+        }}>
+          {/* Connector Line */}
+          <div style={{ width: "30px", height: "2px", background: hoveredNode.data.accentColor, marginTop: "40px" }} />
+          
+          {/* Details Box */}
+          <div style={{
+            pointerEvents: "auto", 
+            width: "320px", 
+            background: "#fff", 
+            borderRadius: "12px", 
+            padding: "16px",
+            border: `2px solid ${hoveredNode.data.accentColor}`, 
+            boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
+          }}>
+            <div style={{ fontWeight: "800", color: hoveredNode.data.accentColor, marginBottom: "10px" }}>
+              {hoveredNode.data.type} Details
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                {Object.entries(hoveredNode.data.rawData || {}).map(([k, v]) => (
+                  v && typeof v !== 'object' && (
+                    <tr key={k}>
+                      <td style={{ color: "#64748b", padding: "4px 0", fontSize: "12px" }}>{k}</td>
+                      <td style={{ textAlign: "right", fontWeight: "600", fontSize: "12px" }}>{String(v)}</td>
+                    </tr>
+                  )
+                ))}
+              </tbody>
+            </table>
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <tbody>
-              {Object.entries(hoveredNode.data.rawData || {}).map(([k, v]) => {
-                if (typeof v === "object" || v === null) return null;
-                return (
-                  <tr key={k}>
-                    <td style={{ fontWeight: "500", padding: "2px 4px", color: "#64748b" }}>{k}</td>
-                    <td style={{ textAlign: "right", padding: "2px 4px", fontWeight: "600" }}>{String(v)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
         </div>
-      )}
-    </div>
+      )} 
+    </div> 
   );
-});
+}); 
 
-export default function GraphView(props) {
+      export default function GraphView(props) {
   return (
-    <div style={{ width: "100%", height: "100vh", flex: 1, display: "flex" }}> 
-      <ReactFlowProvider>
-        <GraphContent {...props} />
-      </ReactFlowProvider>
-    </div>
-  );
+      <div style={{ width: "100%", height: "100vh", flex: 1, display: "flex" }}>
+        <ReactFlowProvider>
+          <GraphContent {...props} />
+        </ReactFlowProvider>
+      </div>
+      );
 }
