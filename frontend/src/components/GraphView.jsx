@@ -164,7 +164,7 @@ const GraphContent = forwardRef((props, ref) => {
 
   const fetchData = useCallback(async () => {
     try {
-      const response = await fetch("http://localhost:10000/api/graph?view=detailed");
+      const response = await fetch(`${API_BASE_URL}/api/graph?view=detailed`);
       const data = await response.json();
       if (!data || !data.orders) return;
 
