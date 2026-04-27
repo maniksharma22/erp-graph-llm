@@ -285,28 +285,18 @@ try {
         safeSQL += " LIMIT 5"; 
     }
 
-    console.log("EXECUTING SQL:", safeSQL);
-
     result = await pool.query({
         text: safeSQL,
         statement_timeout: 15000, 
     });
 
 } catch (sqlError) {
-    // This logs the real error to your Vercel/Render console for debugging
-    console.error("DATABASE_QUERY_ERROR:", {
-        message: sqlError.message,
-        query: cleanSQL
-    });
-    
-    // This returns a polite, non-technical message to the user UI
     return {
         success: false,
-        answer: "I encountered an issue retrieving the ERP data. Please try again with a more specific request.",
+        answer: `Database Error: ${sqlError.message}`,
         nodeIds: [],
     };
 }
-
       if (result.rows.length === 0) {
         return {
           success: true,
