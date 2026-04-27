@@ -532,7 +532,7 @@ try {
   } catch (error) {
       console.error("DETAILED ERROR:", error);
       return {
-        success: false;
+        success: false,
         answer: `System Error: ${error.message}`, 
         nodeIds: [],
       };
