@@ -279,23 +279,25 @@ const cleanSQL = aiResponse.replace(/```sql|```|`/gi, "").trim();
 let result;
 
 try {
-  let safeSQL = cleanSQL;
+  let safeSQL = cleanSQL.replace(/limit\s+\d+/i, "LIMIT 2");
 
-  if (/limit\s+\d+/i.test(safeSQL)) {
-    safeSQL = cleanSQL.replace(/limit\s+\d+/i, "LIMIT 5") + " ";
-  } else {
-    safeSQL += " LIMIT 5";
+  // If no LIMIT present, add it
+  if (!/limit\s+\d+/i.test(cleanSQL)) {
+    safeSQL = cleanSQL + " LIMIT 2";
   }
 
   console.log("FINAL SAFE SQL:", safeSQL);
 
-  result = await pool.query(safeSQL);
+  result = await pool.query({
+    text: safeSQL,
+    statement_timeout: 5000, 
+  });
 
 } catch (sqlError) {
-  console.error("DATABASE ERROR:", sqlError.message);
+  console.error("DATABASE ERROR FULL:", sqlError);
   return {
     success: true,
-    answer: "Query too large. Try smaller like 'Show 2 orders'",
+    answer: "Query too heavy. Try 'Show 2 orders'",
     nodeIds: [],
   };
 }
