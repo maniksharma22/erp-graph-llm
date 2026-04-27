@@ -297,7 +297,7 @@ try {
   console.error("DATABASE ERROR FULL:", sqlError);
   return {
     success: true,
-    answer: "Query too heavy. Try 'Show 2 orders'",
+    answer: "Query too large. Try 'Show two orders'",
     nodeIds: [],
   };
 }
@@ -427,7 +427,7 @@ try {
       Database Data: ${JSON.stringify(finalDataForAI)}`
           },
         ],
-        model: "llama-3.1-8b-instant",
+       model: "llama-3.1-8b-instant",
         temperature: 0.1,
       });
 
