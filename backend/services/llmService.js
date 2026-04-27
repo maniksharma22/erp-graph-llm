@@ -275,25 +275,27 @@ const llmService = {
       }
 
       // --- CLEAN SQL & EXECUTE ---
-     const cleanSQL = aiResponse.replace(/```sql|```|`/gi, "").trim();
+const cleanSQL = aiResponse.replace(/```sql|```|`/gi, "").trim();
 let result;
 
 try {
   let safeSQL = cleanSQL;
 
-  // Force LIMIT if missing
-  if (!/limit\s+\d+/i.test(safeSQL)) {
-    safeSQL += " LIMIT 10";
+  if (/limit\s+\d+/i.test(safeSQL)) {
+    safeSQL = safeSQL.replace(/limit\s+\d+/i, "LIMIT 5");
+  } else {
+    safeSQL += " LIMIT 5";
   }
 
-  console.log("ACTUAL SQL EXECUTING:", safeSQL);
+  console.log("FINAL SAFE SQL:", safeSQL);
 
   result = await pool.query(safeSQL);
+
 } catch (sqlError) {
   console.error("DATABASE ERROR:", sqlError.message);
   return {
     success: true,
-    answer: "I couldn't fetch the results due to query size. Try: 'Show 5 orders' or 'Show latest customers'.",
+    answer: "Query too large. Try smaller like 'Show 2 orders'",
     nodeIds: [],
   };
 }
