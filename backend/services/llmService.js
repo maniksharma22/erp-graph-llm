@@ -529,11 +529,11 @@ try {
         sql: cleanSQL,
         nodeIds: Array.from(nodeIds),
       };
-    } catch (error) {
+  } catch (error) {
       console.error("DETAILED ERROR:", error);
       return {
-        success: false,
-        answer: "The data requested is too large to summarize right now. Please try a more specific query, like 'Show top 5 billing documents' or 'Details for Order 740506'.",
+        success: false;
+        answer: `System Error: ${error.message}`, 
         nodeIds: [],
       };
     }
