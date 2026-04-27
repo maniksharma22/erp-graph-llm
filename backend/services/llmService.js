@@ -279,30 +279,32 @@ const cleanSQL = aiResponse.replace(/```sql|```|`/gi, "").trim();
 let result;
 
 try {
-  let safeSQL = cleanSQL;
+    let safeSQL = cleanSQL;
 
-  if (/limit\s+\d+/i.test(safeSQL)) {
-    safeSQL = safeSQL.replace(/limit\s+\d+/i, "LIMIT 2");
-  } else {
-    safeSQL += " LIMIT 2";
-  }
+    if (!/limit\s+\d+/i.test(safeSQL)) {
+        safeSQL += " LIMIT 5"; 
+    }
 
-  console.log("FINAL SAFE SQL:", safeSQL);
+    console.log("EXECUTING SQL:", safeSQL);
 
-
-  result = await pool.query({
-    text: safeSQL,
-    statement_timeout: 3000, 
-  });
+    result = await pool.query({
+        text: safeSQL,
+        statement_timeout: 15000, 
+    });
 
 } catch (sqlError) {
-  console.error("DATABASE ERROR FULL:", sqlError);
-
-  return {
-    success: true,
-    answer: "Query too large. Try 'Show 2 orders'",
-    nodeIds: [],
-  };
+    // This logs the real error to your Vercel/Render console for debugging
+    console.error("DATABASE_QUERY_ERROR:", {
+        message: sqlError.message,
+        query: cleanSQL
+    });
+    
+    // This returns a polite, non-technical message to the user UI
+    return {
+        success: false,
+        answer: "I encountered an issue retrieving the ERP data. Please try again with a more specific request.",
+        nodeIds: [],
+    };
 }
 
       if (result.rows.length === 0) {
