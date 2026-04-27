@@ -288,10 +288,7 @@ try {
 
   console.log("FINAL SAFE SQL:", safeSQL);
 
-  result = await pool.query({
-    text: safeSQL,
-    statement_timeout: 5000, 
-  });
+ result = await pool.query("SET LOCAL statement_timeout = 3000; " + safeSQL);
 
 } catch (sqlError) {
   console.error("DATABASE ERROR FULL:", sqlError);
