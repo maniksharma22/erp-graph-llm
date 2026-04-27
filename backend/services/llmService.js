@@ -282,7 +282,7 @@ try {
   let safeSQL = cleanSQL;
 
   if (/limit\s+\d+/i.test(safeSQL)) {
-    safeSQL = safeSQL.replace(/limit\s+\d+/i, "LIMIT 5");
+    safeSQL = cleanSQL.replace(/limit\s+\d+/i, "LIMIT 5") + " ";
   } else {
     safeSQL += " LIMIT 5";
   }
