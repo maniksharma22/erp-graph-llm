@@ -275,20 +275,28 @@ const llmService = {
       }
 
       // --- CLEAN SQL & EXECUTE ---
-      const cleanSQL = aiResponse.replace(/```sql|```|`/gi, "").trim();
-      let result;
+     const cleanSQL = aiResponse.replace(/```sql|```|`/gi, "").trim();
+let result;
 
-      try {
-        console.log("ACTUAL SQL EXECUTING:", cleanSQL);
-        result = await pool.query(cleanSQL);
-      } catch (sqlError) {
-        console.error("DATABASE ERROR:", sqlError.message);
-        return {
-          success: true,
-          answer: "I encountered a technical issue while fetching those details. Please try asking: 'Show me top products by invoice count'.",
-          nodeIds: [],
-        };
-      }
+try {
+  let safeSQL = cleanSQL;
+
+  // Force LIMIT if missing
+  if (!/limit\s+\d+/i.test(safeSQL)) {
+    safeSQL += " LIMIT 10";
+  }
+
+  console.log("ACTUAL SQL EXECUTING:", safeSQL);
+
+  result = await pool.query(safeSQL);
+} catch (sqlError) {
+  console.error("DATABASE ERROR:", sqlError.message);
+  return {
+    success: true,
+    answer: "I couldn't fetch the results due to query size. Try: 'Show 5 orders' or 'Show latest customers'.",
+    nodeIds: [],
+  };
+}
 
       if (result.rows.length === 0) {
         return {
