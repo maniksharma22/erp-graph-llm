@@ -258,7 +258,7 @@ const llmService = {
           ...chatHistory,
           { role: "user", content: finalPrompt },
         ],
-      model: "mixtral-8x7b-32768",
+      model: "llama-3.1-8b-instant",
         temperature: 0.1,
       });
 
@@ -425,7 +425,7 @@ try {
       Database Data: ${JSON.stringify(finalDataForAI)}`
           },
         ],
-        model: "mixtral-8x7b-32768",
+        model: "llama-3.1-8b-instant",
         temperature: 0.1,
       });
 
